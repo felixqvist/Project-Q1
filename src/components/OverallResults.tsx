@@ -3,7 +3,6 @@ import {
   buildCategoryRatings,
   marksForCategory,
   scoreTone,
-  type CategoryId,
   type CategoryRating,
 } from '../data/ratings'
 import type { AnalysisResult } from '../lib/faceAnalysis'
@@ -21,13 +20,16 @@ type Props = {
 export default function OverallResults({ result, answers, frontUrl, sideUrl, onRescan }: Props) {
   const categories = buildCategoryRatings(result, answers)
   const [index, setIndex] = useState(0)
-  const trackRef = useRef<HTMLDivElement>(null)
   const startX = useRef(0)
   const deltaX = useRef(0)
   const swiping = useRef(false)
 
   const current = categories[index] ?? categories[0]
   const marks = marksForCategory(current, result)
+  const detailMarks = marks
+    .slice()
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 4)
 
   function go(next: number) {
     setIndex(Math.max(0, Math.min(categories.length - 1, next)))
@@ -43,10 +45,11 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
   }, [index, categories.length])
 
   function onPointerDown(e: ReactPointerEvent) {
+    // Don't steal taps on buttons
+    if ((e.target as HTMLElement).closest('button')) return
     swiping.current = true
     startX.current = e.clientX
     deltaX.current = 0
-    ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
   }
 
   function onPointerMove(e: ReactPointerEvent) {
@@ -62,40 +65,112 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
     deltaX.current = 0
   }
 
+  const preferSide =
+    current.photo === 'side' ||
+    (current.photo === 'both' &&
+      detailMarks.filter((m) => m.photo === 'side').length >
+        detailMarks.filter((m) => m.photo === 'front').length)
+  const preferred: 'front' | 'side' = preferSide ? 'side' : 'front'
+  const preferredMarks = detailMarks.filter((m) => m.photo === preferred)
+  const useSide: 'front' | 'side' =
+    preferredMarks.length > 0 ? preferred : preferred === 'side' ? 'front' : 'side'
+  const useUrl = useSide === 'side' ? sideUrl : frontUrl
+  const useMarks = detailMarks.filter((m) => m.photo === useSide)
+  // Keep list order aligned with numbered markers on the photo
+  const slideSubs = useMarks
+    .map((m) => current.subs.find((s) => s.id === m.id))
+    .filter((s): s is NonNullable<typeof s> => !!s)
+    .slice(0, 4)
+
   return (
-    <section className="results-screen" aria-label="Scan results">
+    <section className="results-screen simple" aria-label="Scan results">
       <header className="results-top">
-        <p className="results-kicker">{answers.name.trim() || 'Your'} scan</p>
+        <p className="results-kicker">
+          {index + 1} / {categories.length} · {answers.name.trim() || 'Your'} scan
+        </p>
         <h1 className="results-title">{current.label}</h1>
         <div className={`results-score ${scoreTone(current.score)}`}>
           <strong>{current.score.toFixed(1)}</strong>
           <span>/ 10</span>
         </div>
-        <div className="overall-bar lime results-bar">
-          <i style={{ width: `${current.score100}%` }} />
-        </div>
-        <p className="results-blurb">{current.blurb}</p>
+        <p className="results-blurb">
+          {current.id === 'overall'
+            ? 'Your total score. Swipe → to see each area on your photo.'
+            : current.blurb}
+        </p>
       </header>
 
       <div
         className="results-swipe"
-        ref={trackRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <CategorySlide
-          cat={current}
-          marks={marks}
-          frontUrl={frontUrl}
-          sideUrl={sideUrl}
-          all={categories}
-          onJump={(id) => {
-            const i = categories.findIndex((c) => c.id === id)
-            if (i >= 0) setIndex(i)
-          }}
-        />
+        {current.id === 'overall' ? (
+          <div className="results-slide overview">
+            <div className="results-photos duo clean">
+              <figure>
+                <img src={frontUrl ?? undefined} alt="Front" />
+                <figcaption>Front</figcaption>
+              </figure>
+              <figure>
+                <img src={sideUrl ?? undefined} alt="Side" />
+                <figcaption>Side</figcaption>
+              </figure>
+            </div>
+
+            <div className="results-simple-list">
+              <p className="results-list-title">Areas · tap or swipe →</p>
+              {categories
+                .filter((c) => c.id !== 'overall')
+                .map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`results-row ${scoreTone(c.score)}`}
+                    onClick={() => go(i + 1)}
+                  >
+                    <span className="results-row-name">{prettyLabel(c)}</span>
+                    <strong>{c.score.toFixed(1)}</strong>
+                    <span className="results-row-go" aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        ) : (
+          <div className="results-slide detail">
+            <FaceAnnotator
+              src={useUrl}
+              alt={`${current.label} photo`}
+              marks={useMarks}
+              side={useSide}
+              numbered
+              limit={4}
+            />
+            <p className="results-map-hint">Numbers on the photo match the list below</p>
+
+            <div className="results-simple-list">
+              {slideSubs.map((sub, i) => (
+                <article key={sub.id} className={`results-card ${scoreTone(sub.score)}`}>
+                  <div className="results-card-top">
+                    <span className="results-card-num">{i + 1}</span>
+                    <span className="results-card-name">{sub.label}</span>
+                    <strong>{sub.score.toFixed(1)}</strong>
+                  </div>
+                  <p>
+                    <b>Problem</b> {shorten(sub.why)}
+                  </p>
+                  <p>
+                    <b>Fix</b> {shorten(sub.fix)}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <nav className="results-nav" aria-label="Result pages">
@@ -138,81 +213,17 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
   )
 }
 
-function CategorySlide({
-  cat,
-  marks,
-  frontUrl,
-  sideUrl,
-  all,
-  onJump,
-}: {
-  cat: CategoryRating
-  marks: ReturnType<typeof marksForCategory>
-  frontUrl: string | null
-  sideUrl: string | null
-  all: CategoryRating[]
-  onJump: (id: CategoryId) => void
-}) {
-  const needsFront =
-    cat.photo === 'both' || cat.photo === 'front' || cat.subs.some((s) => s.photo === 'front')
-  const needsSide =
-    cat.photo === 'both' || cat.photo === 'side' || cat.subs.some((s) => s.photo === 'side')
-  const duo = needsFront && needsSide
+function prettyLabel(c: CategoryRating) {
+  if (c.id === 'lower') return 'Lower third'
+  if (c.id === 'upper') return 'Upper third'
+  if (c.id === 'psl') return 'PSL'
+  if (c.id === 'potential') return 'Potential'
+  return c.label.charAt(0) + c.label.slice(1).toLowerCase()
+}
 
-  return (
-    <div className="results-slide">
-      <div className={`results-photos ${duo ? 'duo' : 'single'}`}>
-        {needsFront ? (
-          <FaceAnnotator src={frontUrl} alt="Front capture" marks={marks} side="front" />
-        ) : null}
-        {needsSide ? (
-          <FaceAnnotator src={sideUrl} alt="Side capture" marks={marks} side="side" />
-        ) : null}
-      </div>
-
-      {cat.id === 'overall' ? (
-        <div className="results-jump-grid">
-          {all
-            .filter((c) => c.id !== 'overall')
-            .map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`results-jump ${scoreTone(c.score)}`}
-                onClick={() => onJump(c.id)}
-              >
-                <span>{c.label}</span>
-                <strong>{c.score.toFixed(1)}</strong>
-                <div className="overall-bar lime">
-                  <i style={{ width: `${c.score100}%` }} />
-                </div>
-              </button>
-            ))}
-        </div>
-      ) : null}
-
-      <div className="results-points">
-        <h2>Points on your face</h2>
-        {cat.subs.map((sub) => (
-          <article key={sub.id} className={`results-point ${scoreTone(sub.score)}`}>
-            <div className="results-point-top">
-              <span className="results-point-name">{sub.label}</span>
-              <strong>{sub.score.toFixed(1)}</strong>
-            </div>
-            <div className="overall-bar lime">
-              <i style={{ width: `${sub.score100}%` }} />
-            </div>
-            <p className="results-why">
-              <span>Why</span>
-              {sub.why}
-            </p>
-            <p className="results-fix">
-              <span>What to do</span>
-              {sub.fix}
-            </p>
-          </article>
-        ))}
-      </div>
-    </div>
-  )
+function shorten(text: string, max = 110) {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max)
+  const last = cut.lastIndexOf(' ')
+  return `${cut.slice(0, last > 60 ? last : max)}…`
 }

@@ -154,7 +154,7 @@ export default function App() {
       setStatus(angle === 'front' ? 'Align front' : 'Align side')
     } catch {
       setCameraOn(false)
-      setError('Camera denied — use Upload instead.')
+      setError('Camera denied — choose a photo from your library instead.')
       setStatus('')
     }
   }
@@ -434,26 +434,29 @@ export default function App() {
               <i className={activeAngle === 'front' ? 'on' : ''} />
               <i className={activeAngle === 'side' ? 'on' : ''} />
             </div>
-            <button
-              type="button"
-              className="btn-take"
-              disabled={busy || !ready}
-              onClick={() => {
-                if (cameraOn) void captureFromCamera()
-                else void startCameraFor(activeAngle)
-              }}
-            >
-              <span className="cam-ico" aria-hidden="true" />
-              Take Picture
-            </button>
-            <button
-              type="button"
-              className="psl-upload-link"
-              onClick={() => openUpload(activeAngle)}
-              disabled={!ready || busy}
-            >
-              Upload instead
-            </button>
+            <div className="psl-actions">
+              <button
+                type="button"
+                className="btn-take"
+                disabled={busy || !ready}
+                onClick={() => {
+                  if (cameraOn) void captureFromCamera()
+                  else void startCameraFor(activeAngle)
+                }}
+              >
+                <span className="cam-ico" aria-hidden="true" />
+                Take Picture
+              </button>
+              <button
+                type="button"
+                className="btn-library"
+                onClick={() => openUpload(activeAngle)}
+                disabled={!ready || busy}
+              >
+                <span className="lib-ico" aria-hidden="true" />
+                Choose from Photos
+              </button>
+            </div>
             <p className={`status${error ? ' error' : ''}`}>{error ?? status}</p>
           </section>
         ) : null}
@@ -613,7 +616,6 @@ export default function App() {
         className="hidden-input"
         type="file"
         accept="image/*"
-        capture="user"
         onChange={onFileChange}
       />
     </div>
