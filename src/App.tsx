@@ -12,7 +12,7 @@ import { QUIZ_QUESTIONS } from './data/quiz'
 import './App.css'
 
 type Page = 'scan' | 'stats' | 'account' | 'profile' | 'faq' | 'about'
-type ScanStep = 'home' | 'quiz' | 'front' | 'side' | 'result' | 'flaws'
+type ScanStep = 'landing' | 'home' | 'quiz' | 'front' | 'side' | 'result' | 'flaws'
 
 type Profile = { name: string; email: string }
 
@@ -112,7 +112,7 @@ function quizLabel(questionId: string, optionId: string): string {
 
 export default function App() {
   const [page, setPage] = useState<Page>('scan')
-  const [step, setStep] = useState<ScanStep>('home')
+  const [step, setStep] = useState<ScanStep>('landing')
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('Indlæser model…')
@@ -249,7 +249,11 @@ export default function App() {
   }
 
   function prevStat() {
-    if (statIndex > 0) setStatIndex((i) => i - 1)
+    if (statIndex > 0) {
+      setStatIndex((i) => i - 1)
+      return
+    }
+    setStep('landing')
   }
 
   function commitQuizAnswer(optionId: string) {
@@ -319,8 +323,15 @@ export default function App() {
   function beginScanFlow() {
     setPage('scan')
     setStatIndex(0)
-    setStep('home')
+    setStep('landing')
     setError(null)
+  }
+
+  function getStarted() {
+    setPage('scan')
+    setStatIndex(0)
+    setError(null)
+    setStep('home')
   }
 
   function openUpload(angle: CaptureAngle) {
@@ -444,9 +455,9 @@ export default function App() {
     setFront(null)
     setSide(null)
     setStatIndex(0)
-    setStep('home')
+    setStep('landing')
     setPage('scan')
-    setStatus(ready ? 'Klar — start med statistik' : 'Indlæser model…')
+    setStatus(ready ? 'Klar' : 'Indlæser model…')
   }
 
   function saveAccount(e: FormEvent) {
@@ -473,9 +484,11 @@ export default function App() {
   const overall100 = result ? scoreTo100(result.overall) : 0
   const ringColor =
     overall100 >= 75 ? 'var(--blue)' : overall100 >= 60 ? 'var(--orange)' : 'var(--red)'
+  const showChrome = !(page === 'scan' && step === 'landing')
 
   return (
-    <div className="app">
+    <div className={`app${page === 'scan' && step === 'landing' ? ' landing-mode' : ''}`}>
+      {showChrome ? (
       <header className="nav">
         <button type="button" className="brand" onClick={() => void resetScan()}>
           SPE<span>JL</span>
@@ -487,7 +500,7 @@ export default function App() {
             onClick={() => {
               go('scan')
               setStatIndex(0)
-              setStep('home')
+              setStep('landing')
             }}
           >
             Scan
@@ -520,8 +533,31 @@ export default function App() {
           ☰
         </button>
       </header>
+      ) : null}
 
-      <main className="main">
+      <main className={`main${page === 'scan' && step === 'landing' ? ' main-landing' : ''}`}>
+        {page === 'scan' && step === 'landing' ? (
+          <section className="landing-hero">
+            <div className="landing-video-wrap">
+              <video
+                className="landing-video"
+                src="/video/looksmax-loop.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/video/looksmax-poster.jpg"
+              />
+            </div>
+            <div className="landing-copy">
+              <p className="landing-tagline">become the best looking version of yourself</p>
+              <button type="button" className="btn-get-started" onClick={getStarted} disabled={!ready}>
+                get started
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         {page === 'scan' && step === 'home' ? (
           <section className="phone-shell intro-stat">
             <div className="progress">
