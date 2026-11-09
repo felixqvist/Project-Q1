@@ -1,24 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   analyzeFrontAndSide,
   warmModels,
-  yawHint,
   type AnalysisResult,
   type CaptureAngle,
-  type ScoreFactor,
 } from './lib/faceAnalysis'
 import { LOOKSMAX_STATS, PSL_TIERS } from './data/stats'
 import Onboarding from './components/Onboarding'
-import PoseGuide from './components/PoseGuide'
+import OverallResults from './components/OverallResults'
 import {
   EMPTY_ANSWERS,
-  IDOLS,
   type OnboardingAnswers,
 } from './data/onboarding'
 import './App.css'
 
 type Page = 'scan' | 'stats' | 'account' | 'profile' | 'faq' | 'about'
-type ScanStep = 'onboarding' | 'front' | 'side' | 'analyzing' | 'result' | 'flaws'
+type ScanStep = 'onboarding' | 'front' | 'side' | 'analyzing' | 'result'
 
 const ANALYZE_QUOTE =
   "You didn't choose your genetics, but you chose to be here — which means you're already ahead of 97% of people."
@@ -41,79 +38,6 @@ function revokeIfBlob(url: string | null) {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
 }
 
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n))
-}
-
-function scoreTo100(score: number): number {
-  return Math.round(clamp(score * 10, 1, 100))
-}
-
-function meterTone(score100: number): 'good' | 'mid' | 'low' {
-  if (score100 >= 75) return 'good'
-  if (score100 >= 60) return 'mid'
-  return 'low'
-}
-
-function tierLabel(overall10: number): string {
-  if (overall10 >= 8.5) return 'Chadlite+'
-  if (overall10 >= 7.5) return 'High normie'
-  if (overall10 >= 6) return 'Mid normie'
-  return 'Developing'
-}
-
-function potentialFrom(result: AnalysisResult, answers: OnboardingAnswers): number {
-  const best = Math.max(...result.factors.map((f) => f.score))
-  let boost = 0.4
-  if (answers.preferPsl === 'with') boost += 0.25
-  if (answers.looksmaxPlan === 'softmaxing' || answers.looksmaxPlan === 'natural') boost += 0.1
-  return scoreTo100(clamp((result.overall + best) / 2 + boost, 1, 10))
-}
-
-function severity(score100: number): 'HIGH' | 'MEDIUM' | 'LOW' {
-  if (score100 < 65) return 'HIGH'
-  if (score100 < 75) return 'MEDIUM'
-  return 'LOW'
-}
-
-function fixFor(factor: ScoreFactor): string {
-  switch (factor.key) {
-    case 'jawline':
-      return 'Sideprofil, posture og blødt sidelys kan fremhæve kæbelinjen (soft-max først).'
-    case 'symmetry':
-      return 'Ret hovedet frontalt og fordel lyset jævnt — small asymmetri er normalt.'
-    case 'eyeBalance':
-      return 'Kig lige i linsen med afslappede øjne. Søvn og hydrering hjælper presence.'
-    case 'proportions':
-      return 'Hold lidt afstand til kameraet, så hele ansigtet er skarpt i frame.'
-    case 'profile':
-      return 'Drej til ren 90° profil med hagen i niveau — det er her PSL-sidefeedback bliver tydelig.'
-    case 'presence':
-      return 'Slap af i kæben, hold stillingen, og undgå skarpt sidelys.'
-    default:
-      return factor.summary
-  }
-}
-
-function shortMetricName(factor: ScoreFactor): string {
-  switch (factor.key) {
-    case 'symmetry':
-      return 'Symmetry'
-    case 'proportions':
-      return 'Proportion'
-    case 'eyeBalance':
-      return 'Eyes'
-    case 'jawline':
-      return 'Jawline'
-    case 'profile':
-      return 'Profile'
-    case 'presence':
-      return factor.source === 'front' ? 'Front' : 'Side'
-    default:
-      return factor.label
-  }
-}
-
 export default function App() {
   const [page, setPage] = useState<Page>('scan')
   const [step, setStep] = useState<ScanStep>('onboarding')
@@ -121,7 +45,6 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('Loading…')
   const [error, setError] = useState<string | null>(null)
-  const [hint, setHint] = useState<string | null>(null)
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
   const [sideUrl, setSideUrl] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -176,27 +99,6 @@ export default function App() {
     void video.play().catch(() => setError('Could not start camera preview.'))
   }, [cameraOn, step, facingMode])
 
-  const metrics = useMemo(() => {
-    if (!result) return []
-    return result.factors.map((f) => {
-      const score100 = scoreTo100(f.score)
-      return { ...f, score100, tone: meterTone(score100), short: shortMetricName(f) }
-    })
-  }, [result])
-
-  const flaws = useMemo(() => {
-    return [...metrics]
-      .sort((a, b) => a.score100 - b.score100)
-      .slice(0, 5)
-      .filter((m) => m.score100 < 85)
-      .map((m) => ({
-        title: m.label,
-        score100: m.score100,
-        level: severity(m.score100),
-        text: fixFor(m),
-      }))
-  }, [metrics])
-
   function setFront(url: string | null) {
     revokeIfBlob(frontUrlRef.current)
     frontUrlRef.current = url
@@ -237,7 +139,6 @@ export default function App() {
   async function startCameraFor(angle: CaptureAngle, mode: 'user' | 'environment' = facingMode) {
     setPage('scan')
     setError(null)
-    setHint(null)
     setResult(null)
     setStep(angle)
     setStatus(angle === 'front' ? 'Opening camera…' : 'Opening side camera…')
@@ -320,12 +221,6 @@ export default function App() {
     }
   }
 
-  async function flipCamera() {
-    const next = facingMode === 'user' ? 'environment' : 'user'
-    const angle: CaptureAngle = step === 'side' ? 'side' : 'front'
-    await startCameraFor(angle, next)
-  }
-
   function tweenProgress(from: number, to: number, ms: number) {
     return new Promise<void>((resolve) => {
       const start = performance.now()
@@ -347,7 +242,6 @@ export default function App() {
     }
     setBusy(true)
     setError(null)
-    setHint(null)
     setAnalyzeProgress(0)
     setStep('analyzing')
     setStatus('Scanning…')
@@ -365,11 +259,6 @@ export default function App() {
       setResult(scored)
       setStep('result')
       setStatus('Scan complete')
-      const frontHint = yawHint(scored.front.yaw, 'front')
-      const sideHint = yawHint(scored.side.yaw, 'side')
-      const idol = IDOLS.find((i) => i.id === answers.idol)?.name
-      const idolHint = idol ? `Reference look: ${idol}.` : null
-      setHint([frontHint, sideHint, idolHint].filter(Boolean).join(' ') || null)
     } catch (err) {
       setResult(null)
       setAnalyzeProgress(0)
@@ -393,7 +282,6 @@ export default function App() {
     await stopCamera()
     setResult(null)
     setError(null)
-    setHint(null)
     setFront(null)
     setSide(null)
     setStep('onboarding')
@@ -422,17 +310,16 @@ export default function App() {
   }
 
   const activeAngle: CaptureAngle = step === 'side' ? 'side' : 'front'
-  const overall100 = result ? scoreTo100(result.overall) : 0
-  const ringColor =
-    overall100 >= 75 ? 'var(--blue)' : overall100 >= 60 ? 'var(--orange)' : 'var(--red)'
-  const hideChrome = page === 'scan' && (step === 'onboarding' || step === 'analyzing')
+  const hideChrome =
+    page === 'scan' &&
+    (step === 'onboarding' || step === 'analyzing' || step === 'front' || step === 'side' || step === 'result')
   const showChrome = !hideChrome
 
   return (
     <div
       className={`app${page === 'scan' && step === 'onboarding' ? ' landing-mode' : ''}${
         page === 'scan' && step === 'analyzing' ? ' analyze-mode' : ''
-      }`}
+      }${page === 'scan' && (step === 'front' || step === 'side' || step === 'result') ? ' scan-dark' : ''}`}
     >
       {showChrome ? (
         <header className="nav">
@@ -487,64 +374,61 @@ export default function App() {
         ) : null}
 
         {page === 'scan' && (step === 'front' || step === 'side') ? (
-          <section className="phone-shell">
-            <div className="progress two">
-              <i className={step === 'front' || frontUrl ? 'on' : ''} />
-              <i className={step === 'side' || sideUrl ? 'on' : ''} />
+          <section className="psl-scan">
+            <h1>PSL Face Scan</h1>
+            <div className="psl-trust">
+              <p>
+                <span aria-hidden="true">🔒</span> Your privacy is our priority
+              </p>
+              <p>
+                <span aria-hidden="true">✓</span> 10,000+ PSL ratings completed
+              </p>
             </div>
-            <h1>{activeAngle === 'front' ? 'Front profile' : 'Side profile'}</h1>
-            <p className="lede">
+            <p className="psl-instruction">
               {activeAngle === 'front'
-                ? 'Look straight into the camera — hair back, relaxed face.'
-                : 'Turn 90° to the right and keep your chin level.'}
+                ? 'Face forward, neutral expression, good lighting'
+                : 'Side profile, show jawline and facial structure'}
             </p>
-            {answers.name ? <div className="summary-chips"><span>Hi {answers.name}</span></div> : null}
-            <div className={`viewfinder ${activeAngle}${busy ? ' scanning' : ''}`}>
-              {cameraOn ? (
-                <video ref={videoRef} playsInline muted autoPlay />
-              ) : activeAngle === 'front' && frontUrl ? (
-                <img src={frontUrl} alt="Front" />
-              ) : activeAngle === 'side' && sideUrl ? (
-                <img src={sideUrl} alt="Side" />
-              ) : (
-                <div className="view-empty" />
-              )}
-              <div className="pose-layer" aria-hidden="true">
-                <PoseGuide angle={activeAngle} />
-              </div>
-              <div className="guide" aria-hidden="true">
-                {activeAngle === 'front' ? <div className="oval" /> : <div className="profile-guide" />}
-              </div>
-              <div className="corners" aria-hidden="true" />
-              <div className="align-pill">
-                {activeAngle === 'front'
-                  ? 'Match the AI guide — face the camera'
-                  : 'Match the AI guide — turn to the side'}
-              </div>
-            </div>
-            <div className="hint-row">
-              <span>Good light</span>
-              <span>No glasses</span>
-              <span>Neutral face</span>
-            </div>
-            <div className="shutter-row">
-              <button type="button" className="btn-dark round" onClick={() => openUpload(activeAngle)} disabled={!ready || busy}>
-                Upload
-              </button>
-              <button
-                type="button"
-                className="shutter"
-                aria-label="Take photo"
-                disabled={busy || (!cameraOn && !(activeAngle === 'front' ? frontUrl : sideUrl))}
-                onClick={() => {
-                  if (cameraOn) void captureFromCamera()
-                  else void startCameraFor(activeAngle)
-                }}
+            <div className={`psl-viewport ${activeAngle}${busy ? ' scanning' : ''}`}>
+              <img
+                className="psl-guide"
+                src={activeAngle === 'front' ? '/guides/front-guide.jpg' : '/guides/side-guide.jpg'}
+                alt=""
+                draggable={false}
               />
-              <button type="button" className="btn-dark round" onClick={() => void flipCamera()} disabled={busy}>
-                Flip
-              </button>
+              {cameraOn ? (
+                <video ref={videoRef} className="psl-live" playsInline muted autoPlay />
+              ) : activeAngle === 'front' && frontUrl ? (
+                <img className="psl-live" src={frontUrl} alt="Front capture" />
+              ) : activeAngle === 'side' && sideUrl ? (
+                <img className="psl-live" src={sideUrl} alt="Side capture" />
+              ) : null}
+              <div className="psl-angle-label">{activeAngle === 'front' ? 'FRONT' : 'SIDE'}</div>
             </div>
+            <div className="psl-dots" aria-hidden="true">
+              <i className={activeAngle === 'front' ? 'on' : ''} />
+              <i className={activeAngle === 'side' ? 'on' : ''} />
+            </div>
+            <button
+              type="button"
+              className="btn-take"
+              disabled={busy || !ready}
+              onClick={() => {
+                if (cameraOn) void captureFromCamera()
+                else void startCameraFor(activeAngle)
+              }}
+            >
+              <span className="cam-ico" aria-hidden="true" />
+              Take Picture
+            </button>
+            <button
+              type="button"
+              className="psl-upload-link"
+              onClick={() => openUpload(activeAngle)}
+              disabled={!ready || busy}
+            >
+              Upload instead
+            </button>
             <p className={`status${error ? ' error' : ''}`}>{error ?? status}</p>
           </section>
         ) : null}
@@ -565,85 +449,13 @@ export default function App() {
         ) : null}
 
         {page === 'scan' && step === 'result' && result ? (
-          <section className="phone-shell">
-            <p className="eyebrow">YOUR SCAN</p>
-            <h1>Results</h1>
-            <div className="summary-chips">
-              {answers.name ? <span>{answers.name}</span> : null}
-              {answers.looksmaxPlan ? <span>{answers.looksmaxPlan}</span> : null}
-              {answers.preferPsl === 'with' ? <span>With PSL</span> : null}
-            </div>
-            <div className="score-row">
-              <div
-                className="score-ring"
-                style={{ background: `conic-gradient(${ringColor} ${overall100 * 3.6}deg, #1e293b 0deg)` }}
-              >
-                <div className="score-core">
-                  <strong>{overall100}</strong>
-                  <span>OVERALL</span>
-                </div>
-              </div>
-              <div className="tier-box">
-                <p>
-                  Tier
-                  <strong>{tierLabel(result.overall)}</strong>
-                </p>
-                <p>
-                  Potential
-                  <strong className="cyan-text">{potentialFrom(result, answers)}</strong>
-                </p>
-              </div>
-            </div>
-            {hint ? <p className="hint-banner">{hint}</p> : null}
-            <div className="metric-grid">
-              {metrics.map((m) => (
-                <article key={`${m.key}-${m.source}`} className="metric-card">
-                  <div className="metric-top">
-                    <span>{m.short}</span>
-                    <strong>{m.score100}</strong>
-                  </div>
-                  <div className="bar">
-                    <i className={m.tone} style={{ width: `${m.score100}%` }} />
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="duo-thumbs">
-              {frontUrl ? <img src={frontUrl} alt="Front" /> : null}
-              {sideUrl ? <img src={sideUrl} alt="Side" /> : null}
-            </div>
-            <button type="button" className="btn-blue wide" onClick={() => setStep('flaws')}>
-              See flaws and fixes
-            </button>
-            <button type="button" className="btn-dark wide" onClick={() => void resetScan()}>
-              New scan
-            </button>
-            <p className="disclaimer">AI estimate. Not a measure of your worth.</p>
-          </section>
-        ) : null}
-
-        {page === 'scan' && step === 'flaws' && result ? (
-          <section className="phone-shell">
-            <p className="eyebrow">{flaws.length} FLAWS FOUND</p>
-            <h1>Flaws & fixes</h1>
-            <div className="flaw-list">
-              {flaws.map((f) => (
-                <article key={f.title} className="flaw-card">
-                  <div className="flaw-top">
-                    <strong>{f.title}</strong>
-                    <span className={f.level === 'HIGH' ? 'bad' : f.level === 'MEDIUM' ? 'mid' : 'ok'}>
-                      {f.level} · {f.score100}/100
-                    </span>
-                  </div>
-                  <p>{f.text}</p>
-                </article>
-              ))}
-            </div>
-            <button type="button" className="btn-dark wide" onClick={() => setStep('result')}>
-              Back to results
-            </button>
-            <p className="disclaimer">AI estimate. Not a measure of your worth.</p>
-          </section>
+          <OverallResults
+            result={result}
+            answers={answers}
+            frontUrl={frontUrl}
+            sideUrl={sideUrl}
+            onRescan={() => void resetScan()}
+          />
         ) : null}
 
         {page === 'stats' ? (

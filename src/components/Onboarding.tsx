@@ -129,12 +129,19 @@ export default function Onboarding({ ready, onComplete }: Props) {
         if (!answers.idol) return setError('Pick someone you want to look like.')
         break
       case 'pslCompare':
-        if (!answers.preferPsl) return setError('Choose with or without PSL.')
+        // Informational only — always continue with PSL path.
+        patch({ preferPsl: 'with' })
         break
       default:
         break
     }
     goNext()
+  }
+
+  function continuePslSlide() {
+    const next = { ...answers, preferPsl: 'with' as const }
+    setAnswers(next)
+    onComplete(next)
   }
 
   return (
@@ -419,31 +426,46 @@ export default function Onboarding({ ready, onComplete }: Props) {
       {step === 'pslCompare' ? (
         <FormSlide title="One last thing" progress={stepIndex} total={STEPS.length}>
           <p className="ob-sub">
-            Choose the path that compounds your results. With PSL awareness, you optimize for the
-            metrics that actually move the scale.
+            With PSL awareness you optimize for the metrics that actually move the scale. Guesswork
+            without it compounds slower.
           </p>
-          <div className="psl-compare">
-            <button
-              type="button"
-              className={`compare-card weak${answers.preferPsl === 'without' ? ' selected' : ''}`}
-              onClick={() => patch({ preferPsl: 'without' })}
-            >
-              <strong>Without PSL</strong>
-              <span className="meter"><i style={{ width: '38%' }} /></span>
-              <small>Guesswork · slower gains</small>
-            </button>
-            <button
-              type="button"
-              className={`compare-card strong${answers.preferPsl === 'with' ? ' selected' : ''}`}
-              onClick={() => patch({ preferPsl: 'with' })}
-            >
-              <strong>With PSL</strong>
-              <span className="meter"><i style={{ width: '92%' }} /></span>
-              <small>Targeted · highest leverage</small>
-            </button>
+          <div className="psl-curve-card" aria-hidden="true">
+            <svg className="psl-curve" viewBox="0 0 320 160" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="pslWithFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
+                  <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {/* Without PSL — flatter */}
+              <path
+                d="M8 128 C 70 120, 120 112, 160 104 S 260 92, 312 86"
+                fill="none"
+                stroke="#64748b"
+                strokeWidth="3"
+                strokeDasharray="6 6"
+              />
+              {/* With PSL — steeper compounding */}
+              <path
+                d="M8 128 C 60 118, 100 96, 150 70 S 240 28, 312 14"
+                fill="none"
+                stroke="#22d3ee"
+                strokeWidth="3.5"
+              />
+              <path
+                d="M8 128 C 60 118, 100 96, 150 70 S 240 28, 312 14 L 312 150 L 8 150 Z"
+                fill="url(#pslWithFill)"
+              />
+              <text x="24" y="148" className="curve-label muted">
+                Without PSL
+              </text>
+              <text x="210" y="28" className="curve-label accent">
+                With PSL
+              </text>
+            </svg>
+            <p className="psl-curve-caption">Best results come from using the app’s PSL framework.</p>
           </div>
-          <NextButton label="Start face scan" onClick={validateAndNext} />
-          {error ? <p className="ob-error">{error}</p> : null}
+          <NextButton label="Start face scan" onClick={continuePslSlide} />
         </FormSlide>
       ) : null}
     </div>
