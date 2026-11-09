@@ -7,17 +7,17 @@ import {
   type CaptureAngle,
   type ScoreFactor,
 } from './lib/faceAnalysis'
+import { LOOKSMAX_STATS, PSL_TIERS } from './data/stats'
+import { QUIZ_QUESTIONS } from './data/quiz'
 import './App.css'
 
-type Page = 'scan' | 'account' | 'profile' | 'faq' | 'about'
-type ScanStep = 'home' | 'front' | 'side' | 'result' | 'flaws'
+type Page = 'scan' | 'stats' | 'account' | 'profile' | 'faq' | 'about'
+type ScanStep = 'home' | 'quiz' | 'front' | 'side' | 'result' | 'flaws'
 
-type Profile = {
-  name: string
-  email: string
-}
+type Profile = { name: string; email: string }
 
 const PROFILE_KEY = 'spejl-profile'
+const QUIZ_KEY = 'spejl-quiz'
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -32,12 +32,12 @@ function revokeIfBlob(url: string | null) {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
 }
 
-function scoreTo100(score: number): number {
-  return Math.round(clamp(score * 10, 1, 100))
-}
-
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
+}
+
+function scoreTo100(score: number): number {
+  return Math.round(clamp(score * 10, 1, 100))
 }
 
 function meterTone(score100: number): 'good' | 'mid' | 'low' {
@@ -47,15 +47,18 @@ function meterTone(score100: number): 'good' | 'mid' | 'low' {
 }
 
 function tierLabel(overall10: number): string {
-  if (overall10 >= 8.5) return 'Excellent'
-  if (overall10 >= 7.5) return 'Above average'
-  if (overall10 >= 6) return 'Average'
+  if (overall10 >= 8.5) return 'Chadlite+'
+  if (overall10 >= 7.5) return 'High normie'
+  if (overall10 >= 6) return 'Mid normie'
   return 'Developing'
 }
 
-function potentialFrom(result: AnalysisResult): number {
+function potentialFrom(result: AnalysisResult, answers: Record<string, string>): number {
   const best = Math.max(...result.factors.map((f) => f.score))
-  return scoreTo100(clamp((result.overall + best) / 2 + 0.4, 1, 10))
+  let boost = 0.4
+  if (answers.sleep === 'great' || answers.sleep === 'good') boost += 0.2
+  if (answers.routine === 'both' || answers.routine === 'gym') boost += 0.15
+  return scoreTo100(clamp((result.overall + best) / 2 + boost, 1, 10))
 }
 
 function severity(score100: number): 'HIGH' | 'MEDIUM' | 'LOW' {
@@ -67,17 +70,17 @@ function severity(score100: number): 'HIGH' | 'MEDIUM' | 'LOW' {
 function fixFor(factor: ScoreFactor): string {
   switch (factor.key) {
     case 'jawline':
-      return 'Sideprofil og nakkeholdning kan fremhæve kæbelinjen. Prøv bedre sidelys.'
+      return 'Sideprofil, posture og blødt sidelys kan fremhæve kæbelinjen (soft-max først).'
     case 'symmetry':
-      return 'Ret hovedet frontalt og fordel lyset jævnt på begge sider af ansigtet.'
+      return 'Ret hovedet frontalt og fordel lyset jævnt — small asymmetri er normalt.'
     case 'eyeBalance':
-      return 'Kig lige ind i linsen med afslappede øjne og blødt frontlys.'
+      return 'Kig lige i linsen med afslappede øjne. Søvn og hydrering hjælper presence.'
     case 'proportions':
-      return 'Hold lidt afstand til kameraet, så hele ansigtet er skarpt i billedet.'
+      return 'Hold lidt afstand til kameraet, så hele ansigtet er skarpt i frame.'
     case 'profile':
-      return 'Drej til ren 90° profil med hagen i niveau og en rolig baggrund.'
+      return 'Drej til ren 90° profil med hagen i niveau — det er her PSL-sidefeedback bliver tydelig.'
     case 'presence':
-      return 'Slap af i kæben, hold stillingen stabil, og undgå skarpt sidelys.'
+      return 'Slap af i kæben, hold stillingen, og undgå skarpt sidelys.'
     default:
       return factor.summary
   }
@@ -102,6 +105,11 @@ function shortMetricName(factor: ScoreFactor): string {
   }
 }
 
+function quizLabel(questionId: string, optionId: string): string {
+  const q = QUIZ_QUESTIONS.find((item) => item.id === questionId)
+  return q?.options.find((o) => o.id === optionId)?.label ?? optionId
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>('scan')
   const [step, setStep] = useState<ScanStep>('home')
@@ -115,6 +123,16 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [cameraOn, setCameraOn] = useState(false)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
+  const [quizIndex, setQuizIndex] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem(QUIZ_KEY)
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [selected, setSelected] = useState<string | null>(null)
   const [profile, setProfile] = useState<Profile | null>(() => {
     try {
       const raw = localStorage.getItem(PROFILE_KEY)
@@ -139,7 +157,7 @@ export default function App() {
       .then(() => {
         if (cancelled) return
         setReady(true)
-        setStatus('Klar til scan')
+        setStatus('Klar til quiz + scan')
       })
       .catch(() => {
         if (cancelled) return
@@ -183,6 +201,9 @@ export default function App() {
       }))
   }, [metrics])
 
+  const quizDone = QUIZ_QUESTIONS.every((q) => answers[q.id])
+  const currentQuestion = QUIZ_QUESTIONS[quizIndex]
+
   function setFront(url: string | null) {
     revokeIfBlob(frontUrlRef.current)
     frontUrlRef.current = url
@@ -202,14 +223,68 @@ export default function App() {
     setCameraOn(false)
   }
 
+  function go(pageName: Page) {
+    setMenuOpen(false)
+    void stopCamera()
+    setPage(pageName)
+  }
+
+  function startQuiz() {
+    setPage('scan')
+    setError(null)
+    setStep('quiz')
+    const firstUnanswered = QUIZ_QUESTIONS.findIndex((q) => !answers[q.id])
+    const idx = firstUnanswered === -1 ? 0 : firstUnanswered
+    setQuizIndex(idx)
+    setSelected(answers[QUIZ_QUESTIONS[idx].id] ?? null)
+  }
+
+  function commitQuizAnswer(optionId: string) {
+    if (!currentQuestion) return
+    setSelected(optionId)
+    const nextAnswers = { ...answers, [currentQuestion.id]: optionId }
+    setAnswers(nextAnswers)
+    localStorage.setItem(QUIZ_KEY, JSON.stringify(nextAnswers))
+
+    if (quizIndex < QUIZ_QUESTIONS.length - 1) {
+      const nextIdx = quizIndex + 1
+      window.setTimeout(() => {
+        setQuizIndex(nextIdx)
+        setSelected(nextAnswers[QUIZ_QUESTIONS[nextIdx].id] ?? null)
+      }, 180)
+      return
+    }
+    setStatus('Quiz færdig — klar til frontfoto')
+    window.setTimeout(() => {
+      void startCameraFor('front')
+    }, 220)
+  }
+
+  function nextQuiz() {
+    if (!currentQuestion || !selected) return
+    commitQuizAnswer(selected)
+  }
+
+  function prevQuiz() {
+    if (quizIndex === 0) {
+      setStep('home')
+      return
+    }
+    const prev = quizIndex - 1
+    setQuizIndex(prev)
+    setSelected(answers[QUIZ_QUESTIONS[prev].id] ?? null)
+  }
+
   async function startCameraFor(angle: CaptureAngle, mode: 'user' | 'environment' = facingMode) {
+    if (!quizDone && angle === 'front' && step !== 'quiz' && Object.keys(answers).length < QUIZ_QUESTIONS.length) {
+      // require quiz before first capture unless already completed
+    }
     setPage('scan')
     setError(null)
     setHint(null)
     setResult(null)
     setStep(angle)
     setStatus(angle === 'front' ? 'Åbner kamera…' : 'Åbner sidekamera…')
-
     try {
       streamRef.current?.getTracks().forEach((t) => t.stop())
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -227,14 +302,19 @@ export default function App() {
     }
   }
 
-  function go(pageName: Page) {
-    setMenuOpen(false)
-    void stopCamera()
-    setPage(pageName)
-    if (pageName === 'scan' && step === 'flaws') setStep('result')
+  function beginScanFlow() {
+    if (!QUIZ_QUESTIONS.every((q) => answers[q.id])) {
+      startQuiz()
+      return
+    }
+    void startCameraFor('front')
   }
 
   function openUpload(angle: CaptureAngle) {
+    if (!QUIZ_QUESTIONS.every((q) => answers[q.id]) && angle === 'front') {
+      startQuiz()
+      return
+    }
     setError(null)
     uploadTargetRef.current = angle
     setPage('scan')
@@ -303,6 +383,10 @@ export default function App() {
   }
 
   async function useSamples() {
+    if (!QUIZ_QUESTIONS.every((q) => answers[q.id])) {
+      startQuiz()
+      return
+    }
     await stopCamera()
     setPage('scan')
     setResult(null)
@@ -331,7 +415,13 @@ export default function App() {
       setStatus('Scan færdig')
       const frontHint = yawHint(scored.front.yaw, 'front')
       const sideHint = yawHint(scored.side.yaw, 'side')
-      setHint([frontHint, sideHint].filter(Boolean).join(' ') || null)
+      const focusHint =
+        answers.focus === 'jaw'
+          ? 'Dit fokus ønskede kæbe/side-feedback — se Profile + Jawline.'
+          : answers.focus === 'eyes'
+            ? 'Dit fokus var øjne — se Eyes-metricen.'
+            : null
+      setHint([frontHint, sideHint, focusHint].filter(Boolean).join(' ') || null)
     } catch (err) {
       setResult(null)
       if (err instanceof Error && err.message === 'NO_FACE_FRONT') {
@@ -358,7 +448,7 @@ export default function App() {
     setSide(null)
     setStep('home')
     setPage('scan')
-    setStatus(ready ? 'Klar til scan' : 'Indlæser model…')
+    setStatus(ready ? 'Klar til quiz + scan' : 'Indlæser model…')
   }
 
   function saveAccount(e: FormEvent) {
@@ -384,7 +474,7 @@ export default function App() {
   const activeAngle: CaptureAngle = step === 'side' ? 'side' : 'front'
   const overall100 = result ? scoreTo100(result.overall) : 0
   const ringColor =
-    overall100 >= 75 ? 'var(--lime)' : overall100 >= 60 ? 'var(--orange)' : 'var(--red)'
+    overall100 >= 75 ? 'var(--blue)' : overall100 >= 60 ? 'var(--orange)' : 'var(--red)'
 
   return (
     <div className="app">
@@ -395,6 +485,9 @@ export default function App() {
         <nav className={`nav-links${menuOpen ? ' open' : ''}`}>
           <button type="button" className={page === 'scan' ? 'active' : ''} onClick={() => go('scan')}>
             Scan
+          </button>
+          <button type="button" className={page === 'stats' ? 'active' : ''} onClick={() => go('stats')}>
+            Stats
           </button>
           <button type="button" className={page === 'faq' ? 'active' : ''} onClick={() => go('faq')}>
             FAQ
@@ -411,68 +504,118 @@ export default function App() {
           </button>
           <button
             type="button"
-            className={`lime ${page === 'profile' ? 'active' : ''}`}
+            className={`primary ${page === 'profile' ? 'active' : ''}`}
             onClick={() => go('profile')}
           >
             Profil
           </button>
         </nav>
-        <button
-          type="button"
-          className="menu-toggle"
-          aria-label="Menu"
-          onClick={() => setMenuOpen((v) => !v)}
-        >
+        <button type="button" className="menu-toggle" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>
           ☰
         </button>
       </header>
 
       <main className="main">
         {page === 'scan' && step === 'home' ? (
-          <section className="phone-shell home">
-            <p className="eyebrow">LOOKSMAX FACE SCANNER</p>
-            <h1>Scan dit look</h1>
+          <section className="content-shell home-wide">
+            <p className="eyebrow">LOOKSMAX · PSL · LOCAL SCAN</p>
+            <h1>Scan dit look — moderne og lokalt</h1>
             <p className="lede">
-              Tag front og side. SPEJL analyserer lokalt og giver dig score, flaws og fixes.
+              Først et kort spørgeskema, så front + side. SPEJL kombinerer looksmax/PSL-kontekst med
+              en lokal ansigtsanalyse — uden betalte API’er.
             </p>
-            <div className="home-cards">
-              <article>
-                <strong>1. Front</strong>
-                <span>Kig lige ind i kameraet</span>
-              </article>
-              <article>
-                <strong>2. Side</strong>
-                <span>Drej 90° til højre</span>
-              </article>
+
+            <div className="stats-grid">
+              {LOOKSMAX_STATS.slice(0, 4).map((stat) => (
+                <article key={stat.label} className="stat-card">
+                  <strong>{stat.value}</strong>
+                  <span>{stat.label}</span>
+                  <p>{stat.detail}</p>
+                  <small>{stat.source}</small>
+                </article>
+              ))}
             </div>
-            <button type="button" className="btn-lime wide" disabled={!ready || busy} onClick={() => void startCameraFor('front')}>
-              Start scan
-            </button>
+
             <div className="home-actions">
-              <button type="button" className="btn-dark" disabled={!ready || busy} onClick={() => openUpload('front')}>
-                Upload
+              <button type="button" className="btn-blue wide" disabled={!ready || busy} onClick={beginScanFlow}>
+                {quizDone ? 'Fortsæt til kamera' : 'Start spørgeskema'}
               </button>
-              <button type="button" className="btn-dark" disabled={!ready || busy} onClick={() => void useSamples()}>
-                Prøv eksempel
+              <div className="home-actions row">
+                <button type="button" className="btn-dark" onClick={() => go('stats')}>
+                  Se alle stats
+                </button>
+                <button type="button" className="btn-dark" disabled={!ready || busy} onClick={() => void useSamples()}>
+                  Prøv eksempel
+                </button>
+              </div>
+            </div>
+            {quizDone ? (
+              <div className="summary-chips">
+                {QUIZ_QUESTIONS.slice(0, 3).map((q) => (
+                  <span key={q.id}>{quizLabel(q.id, answers[q.id])}</span>
+                ))}
+              </div>
+            ) : null}
+            <p className={`status${error ? ' error' : ''}`}>{error ?? status}</p>
+            <p className="disclaimer">
+              PSL/looksmax-tal er indsamlet fra offentlige artikler og studier (TikTok-hashtags, Google-
+              søgeinteresse). Skalaen er community-baseret — ikke et videnskabeligt skønhedsmål.
+            </p>
+          </section>
+        ) : null}
+
+        {page === 'scan' && step === 'quiz' && currentQuestion ? (
+          <section className="phone-shell">
+            <div className="progress">
+              {QUIZ_QUESTIONS.map((q, i) => (
+                <i key={q.id} className={i <= quizIndex ? 'on' : ''} />
+              ))}
+            </div>
+            <div className="quiz-meta">
+              <span>
+                Spørgsmål {quizIndex + 1}/{QUIZ_QUESTIONS.length}
+              </span>
+              <span>Før kamera</span>
+            </div>
+            <div className="quiz-card">
+              <h2>{currentQuestion.prompt}</h2>
+              {currentQuestion.hint ? <p className="lede" style={{ marginBottom: 0 }}>{currentQuestion.hint}</p> : null}
+              <div className="quiz-options">
+                {currentQuestion.options.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={selected === opt.id ? 'selected' : ''}
+                    onClick={() => commitQuizAnswer(opt.id)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="quiz-actions">
+              <button type="button" className="btn-blue wide" disabled={!selected} onClick={nextQuiz}>
+                {quizIndex === QUIZ_QUESTIONS.length - 1 ? 'Gå til kamera' : 'Næste'}
+              </button>
+              <button type="button" className="btn-dark wide" onClick={prevQuiz}>
+                Tilbage
               </button>
             </div>
-            <p className={`status${error ? ' error' : ''}`}>{error ?? status}</p>
           </section>
         ) : null}
 
         {page === 'scan' && (step === 'front' || step === 'side') ? (
-          <section className="phone-shell capture">
-            <div className="progress">
+          <section className="phone-shell">
+            <div className="progress two">
               <i className={step === 'front' || frontUrl ? 'on' : ''} />
               <i className={step === 'side' || sideUrl ? 'on' : ''} />
             </div>
             <h1>{activeAngle === 'front' ? 'Front profile' : 'Side profile'}</h1>
             <p className="lede">
               {activeAngle === 'front'
-                ? 'Look straight into the camera, hair pulled back, relaxed face.'
-                : 'Turn 90° to the right and keep your chin level.'}
+                ? 'Kig lige ind i kameraet — hår væk fra ansigt, afslappet look.'
+                : 'Drej 90° til højre og hold hagen i niveau.'}
             </p>
-
             <div className={`viewfinder ${activeAngle}${busy ? ' scanning' : ''}`}>
               {cameraOn ? (
                 <video ref={videoRef} playsInline muted autoPlay />
@@ -489,13 +632,11 @@ export default function App() {
               <div className="corners" aria-hidden="true" />
               <div className="align-pill">Align your face inside the outline</div>
             </div>
-
             <div className="hint-row">
               <span>Good light</span>
               <span>No glasses</span>
               <span>Neutral face</span>
             </div>
-
             <div className="shutter-row">
               <button type="button" className="btn-dark round" onClick={() => openUpload(activeAngle)} disabled={!ready || busy}>
                 Upload
@@ -514,7 +655,6 @@ export default function App() {
                 Flip
               </button>
             </div>
-
             <div className="capture-extra">
               <button type="button" className="linkish" onClick={() => void resetScan()}>
                 Annuller
@@ -530,16 +670,18 @@ export default function App() {
         ) : null}
 
         {page === 'scan' && step === 'result' && result ? (
-          <section className="phone-shell results">
+          <section className="phone-shell">
             <p className="eyebrow">YOUR SCAN</p>
             <h1>Results</h1>
-
+            <div className="summary-chips">
+              {answers.goal ? <span>{quizLabel('goal', answers.goal)}</span> : null}
+              {answers.focus ? <span>{quizLabel('focus', answers.focus)}</span> : null}
+              {answers.pslKnow ? <span>{quizLabel('pslKnow', answers.pslKnow)}</span> : null}
+            </div>
             <div className="score-row">
               <div
                 className="score-ring"
-                style={{
-                  background: `conic-gradient(${ringColor} ${overall100 * 3.6}deg, #222 0deg)`,
-                }}
+                style={{ background: `conic-gradient(${ringColor} ${overall100 * 3.6}deg, #1e293b 0deg)` }}
               >
                 <div className="score-core">
                   <strong>{overall100}</strong>
@@ -553,13 +695,11 @@ export default function App() {
                 </p>
                 <p>
                   Potential
-                  <strong className="lime-text">{potentialFrom(result)}</strong>
+                  <strong className="cyan-text">{potentialFrom(result, answers)}</strong>
                 </p>
               </div>
             </div>
-
             {hint ? <p className="hint-banner">{hint}</p> : null}
-
             <div className="metric-grid">
               {metrics.map((m) => (
                 <article key={`${m.key}-${m.source}`} className="metric-card">
@@ -573,13 +713,11 @@ export default function App() {
                 </article>
               ))}
             </div>
-
             <div className="duo-thumbs">
               {frontUrl ? <img src={frontUrl} alt="Front" /> : null}
               {sideUrl ? <img src={sideUrl} alt="Side" /> : null}
             </div>
-
-            <button type="button" className="btn-lime wide" onClick={() => setStep('flaws')}>
+            <button type="button" className="btn-blue wide" onClick={() => setStep('flaws')}>
               See flaws and fixes
             </button>
             <button type="button" className="btn-dark wide" onClick={() => void resetScan()}>
@@ -590,7 +728,7 @@ export default function App() {
         ) : null}
 
         {page === 'scan' && step === 'flaws' && result ? (
-          <section className="phone-shell flaws">
+          <section className="phone-shell">
             <p className="eyebrow">{flaws.length} FLAWS FOUND</p>
             <h1>Flaws & fixes</h1>
             <div className="flaw-list">
@@ -607,9 +745,9 @@ export default function App() {
               ))}
             </div>
             <div className="upsell">
-              <strong>Flere metrics + glow-up plan</strong>
-              <span>Opret konto for at gemme dine scans lokalt.</span>
-              <button type="button" className="btn-lime wide" onClick={() => go('account')}>
+              <strong>Gem dine quiz-svar + scans</strong>
+              <span>Opret en lokal konto for at huske profilen i browseren.</span>
+              <button type="button" className="btn-blue wide" onClick={() => go('account')}>
                 Opret konto
               </button>
             </div>
@@ -620,11 +758,51 @@ export default function App() {
           </section>
         ) : null}
 
+        {page === 'stats' ? (
+          <section className="content-shell">
+            <p className="eyebrow">TIKTOK · GOOGLE · PSL</p>
+            <h1>Looksmaxing stats</h1>
+            <p className="lede">
+              Udvalgte offentlige tal om looksmaxxing, mewing og PSL-skalaen — til kontekst før din
+              egen scan.
+            </p>
+            <div className="stats-grid">
+              {LOOKSMAX_STATS.map((stat) => (
+                <article key={stat.label} className="stat-card">
+                  <strong>{stat.value}</strong>
+                  <span>{stat.label}</span>
+                  <p>{stat.detail}</p>
+                  <small>{stat.source}</small>
+                </article>
+              ))}
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-display)', margin: '0.4rem 0 0.7rem' }}>PSL-tier guide</h2>
+            <div className="tier-strip">
+              {PSL_TIERS.map((tier) => (
+                <article key={tier.range}>
+                  <b>{tier.range}</b>
+                  <div>
+                    <strong>{tier.name}</strong>
+                    <span>{tier.note}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <button type="button" className="btn-blue wide" onClick={beginScanFlow}>
+              {quizDone ? 'Gå til scan' : 'Start spørgeskema'}
+            </button>
+            <p className="disclaimer">
+              Kilder bl.a. Rising Trends, GQ, The Conversation, Bustle og SAGE TikTok-studie (sep.
+              2024 hashtag-data). Tal kan ændre sig over tid.
+            </p>
+          </section>
+        ) : null}
+
         {page === 'account' ? (
           <section className="content-shell">
             <p className="eyebrow">ACCOUNT</p>
             <h1>Opret konto</h1>
-            <p className="lede">Gem profil lokalt i browseren — ingen server, ingen betalt API.</p>
+            <p className="lede">Gem profil lokalt i browseren — ingen server.</p>
             <form className="form" onSubmit={saveAccount}>
               <label>
                 Navn
@@ -655,13 +833,10 @@ export default function App() {
                   autoComplete="new-password"
                 />
               </label>
-              <button type="submit" className="btn-lime wide">
+              <button type="submit" className="btn-blue wide">
                 Opret konto
               </button>
             </form>
-            {profile ? (
-              <p className="status">Konto fundet — gå til Profil for at se den.</p>
-            ) : null}
             {error && page === 'account' ? <p className="status error">{error}</p> : null}
           </section>
         ) : null}
@@ -685,12 +860,12 @@ export default function App() {
                     <strong>{result ? scoreTo100(result.overall) : '—'}</strong>
                   </article>
                   <article>
-                    <span>Scans</span>
-                    <strong>{result ? 1 : 0}</strong>
+                    <span>Quiz</span>
+                    <strong>{quizDone ? 'Done' : '—'}</strong>
                   </article>
                 </div>
-                <button type="button" className="btn-lime wide" onClick={() => go('scan')}>
-                  Start ny scan
+                <button type="button" className="btn-blue wide" onClick={beginScanFlow}>
+                  Start scan
                 </button>
                 <button type="button" className="btn-dark wide" onClick={logout}>
                   Log ud
@@ -698,8 +873,8 @@ export default function App() {
               </>
             ) : (
               <>
-                <p className="lede">Du har endnu ingen lokal konto.</p>
-                <button type="button" className="btn-lime wide" onClick={() => go('account')}>
+                <p className="lede">Ingen lokal konto endnu.</p>
+                <button type="button" className="btn-blue wide" onClick={() => go('account')}>
                   Opret konto
                 </button>
               </>
@@ -713,26 +888,28 @@ export default function App() {
             <h1>FAQ</h1>
             <div className="faq-list">
               <details open>
-                <summary>Hvordan virker scoren?</summary>
+                <summary>Hvorfor skal jeg svare på spørgsmål først?</summary>
                 <p>
-                  SPEJL finder ansigtspunkter lokalt med MediaPipe. Front vægter symmetri,
-                  proportioner og øjne. Side vægter profilsilhuet og kæbelinje. Samlet score er
-                  1–10 (vist som 0–100 i results).
+                  Quizzen tilpasser tip og potentiale (søvn, fokus, PSL-kendskab), så feedbacken
+                  matcher det, du faktisk vil forbedre.
                 </p>
               </details>
               <details>
-                <summary>Skal jeg bruge kamera?</summary>
-                <p>Kamera er foretrukket, men du kan uploade front- og sidefotos som fallback.</p>
-              </details>
-              <details>
-                <summary>Sendes mine billeder til en server?</summary>
-                <p>Nej. Analysen kører i browseren på localhost. Konto gemmes kun i localStorage.</p>
-              </details>
-              <details>
-                <summary>Er det et videnskabeligt skønhedsmål?</summary>
+                <summary>Hvad er PSL?</summary>
                 <p>
-                  Nej. Det er en transparent demo-heuristik til looksmax-feedback — ikke et mål for
-                  din værdi.
+                  PSL er et community-ratingsystem fra looksmax-kultur (typisk 1–8). Det er
+                  populært på TikTok, men pseudovidenskabeligt — SPEJL bruger det kun som kontekst.
+                </p>
+              </details>
+              <details>
+                <summary>Sendes mine billeder væk?</summary>
+                <p>Nej. Analyse kører lokalt i browseren på localhost.</p>
+              </details>
+              <details>
+                <summary>Er statsene opdaterede?</summary>
+                <p>
+                  De er taget fra offentlige kilder (Rising Trends, TikTok-studie sep. 2024, m.fl.)
+                  og kan ændre sig. Se Stats-siden for kildehenvisninger.
                 </p>
               </details>
             </div>
@@ -744,25 +921,25 @@ export default function App() {
             <p className="eyebrow">SPEJL</p>
             <h1>About us</h1>
             <p className="lede">
-              SPEJL er en lokal Looksmax Face Scanner bygget til hurtig front + side analyse uden
-              betalte API’er.
+              SPEJL er en moderne, lokal looksmax-scanner: quiz → front/side → score + fixes, med
+              PSL/TikTok-kontekst — uden at sende dit ansigt til en betalt cloud-API.
             </p>
             <div className="about-grid">
               <article>
-                <strong>Lokal først</strong>
-                <span>Modeller og scoring kører i din browser på localhost.</span>
+                <strong>Blå, clean UI</strong>
+                <span>Mere moderne scanner-look med blå/cyan actions i stedet for neon-lime.</span>
               </article>
               <article>
-                <strong>To vinkler</strong>
-                <span>Front og side kombineres til én score med konstruktive fixes.</span>
+                <strong>Data med forbehold</strong>
+                <span>Stats fra Google/TikTok-dækning — til orientering, ikke som facit.</span>
               </article>
               <article>
-                <strong>Ærlig tone</strong>
-                <span>Feedback er direkte, men ikke ond — fokus på forbedringer.</span>
+                <strong>Soft-max først</strong>
+                <span>Vi foreslår konstruktive fixes — ikke ekstrem hardmax.</span>
               </article>
             </div>
-            <button type="button" className="btn-lime wide" onClick={() => go('scan')}>
-              Start scan
+            <button type="button" className="btn-blue wide" onClick={beginScanFlow}>
+              Start spørgeskema
             </button>
           </section>
         ) : null}
