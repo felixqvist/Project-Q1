@@ -280,13 +280,34 @@ h1 {
 
 .progress {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
+  gap: 0.35rem;
   margin-bottom: 1rem;
 }
 
 .progress.two {
   grid-template-columns: 1fr 1fr;
+}
+
+.feature-stat {
+  margin: 0.4rem 0 1.1rem;
+  padding: 1.35rem 1.2rem 1.2rem;
+  min-height: 210px;
+  animation: rise 0.35s ease both;
+}
+
+.feature-stat strong {
+  font-size: clamp(2.4rem, 10vw, 3.4rem);
+  margin-bottom: 0.35rem;
+}
+
+.feature-stat span {
+  font-size: 1rem;
+}
+
+.feature-stat p {
+  font-size: 0.95rem;
+  margin-top: 0.35rem;
 }
 
 .progress i {

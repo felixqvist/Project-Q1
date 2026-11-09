@@ -123,6 +123,7 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [cameraOn, setCameraOn] = useState(false)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
+  const [statIndex, setStatIndex] = useState(0)
   const [quizIndex, setQuizIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     try {
@@ -157,7 +158,7 @@ export default function App() {
       .then(() => {
         if (cancelled) return
         setReady(true)
-        setStatus('Klar til quiz + scan')
+        setStatus('Klar — start med statistik')
       })
       .catch(() => {
         if (cancelled) return
@@ -239,6 +240,18 @@ export default function App() {
     setSelected(answers[QUIZ_QUESTIONS[idx].id] ?? null)
   }
 
+  function nextStat() {
+    if (statIndex < LOOKSMAX_STATS.length - 1) {
+      setStatIndex((i) => i + 1)
+      return
+    }
+    startQuiz()
+  }
+
+  function prevStat() {
+    if (statIndex > 0) setStatIndex((i) => i - 1)
+  }
+
   function commitQuizAnswer(optionId: string) {
     if (!currentQuestion) return
     setSelected(optionId)
@@ -267,6 +280,7 @@ export default function App() {
 
   function prevQuiz() {
     if (quizIndex === 0) {
+      setStatIndex(LOOKSMAX_STATS.length - 1)
       setStep('home')
       return
     }
@@ -303,11 +317,10 @@ export default function App() {
   }
 
   function beginScanFlow() {
-    if (!QUIZ_QUESTIONS.every((q) => answers[q.id])) {
-      startQuiz()
-      return
-    }
-    void startCameraFor('front')
+    setPage('scan')
+    setStatIndex(0)
+    setStep('home')
+    setError(null)
   }
 
   function openUpload(angle: CaptureAngle) {
@@ -384,7 +397,7 @@ export default function App() {
 
   async function useSamples() {
     if (!QUIZ_QUESTIONS.every((q) => answers[q.id])) {
-      startQuiz()
+      beginScanFlow()
       return
     }
     await stopCamera()
@@ -446,9 +459,10 @@ export default function App() {
     setHint(null)
     setFront(null)
     setSide(null)
+    setStatIndex(0)
     setStep('home')
     setPage('scan')
-    setStatus(ready ? 'Klar til quiz + scan' : 'Indlæser model…')
+    setStatus(ready ? 'Klar — start med statistik' : 'Indlæser model…')
   }
 
   function saveAccount(e: FormEvent) {
@@ -483,7 +497,15 @@ export default function App() {
           SPE<span>JL</span>
         </button>
         <nav className={`nav-links${menuOpen ? ' open' : ''}`}>
-          <button type="button" className={page === 'scan' ? 'active' : ''} onClick={() => go('scan')}>
+          <button
+            type="button"
+            className={page === 'scan' ? 'active' : ''}
+            onClick={() => {
+              go('scan')
+              setStatIndex(0)
+              setStep('home')
+            }}
+          >
             Scan
           </button>
           <button type="button" className={page === 'stats' ? 'active' : ''} onClick={() => go('stats')}>
@@ -517,49 +539,46 @@ export default function App() {
 
       <main className="main">
         {page === 'scan' && step === 'home' ? (
-          <section className="content-shell home-wide">
-            <p className="eyebrow">LOOKSMAX · PSL · LOCAL SCAN</p>
-            <h1>Scan dit look — moderne og lokalt</h1>
-            <p className="lede">
-              Først et kort spørgeskema, så front + side. SPEJL kombinerer looksmax/PSL-kontekst med
-              en lokal ansigtsanalyse — uden betalte API’er.
-            </p>
-
-            <div className="stats-grid">
-              {LOOKSMAX_STATS.slice(0, 4).map((stat) => (
-                <article key={stat.label} className="stat-card">
-                  <strong>{stat.value}</strong>
-                  <span>{stat.label}</span>
-                  <p>{stat.detail}</p>
-                  <small>{stat.source}</small>
-                </article>
+          <section className="phone-shell intro-stat">
+            <div className="progress">
+              {LOOKSMAX_STATS.map((stat, i) => (
+                <i key={stat.label} className={i <= statIndex ? 'on' : ''} />
               ))}
             </div>
+            <div className="quiz-meta">
+              <span>
+                Statistik {statIndex + 1}/{LOOKSMAX_STATS.length}
+              </span>
+              <span>Før spørgsmål</span>
+            </div>
+            <p className="eyebrow">LOOKSMAX · PSL · TIKTOK</p>
+            <h1>Vidste du det?</h1>
+            <p className="lede">Først lidt kontekst — tryk Næste for at fortsætte.</p>
+
+            <article className="stat-card feature-stat" key={LOOKSMAX_STATS[statIndex].label}>
+              <strong>{LOOKSMAX_STATS[statIndex].value}</strong>
+              <span>{LOOKSMAX_STATS[statIndex].label}</span>
+              <p>{LOOKSMAX_STATS[statIndex].detail}</p>
+              <small>{LOOKSMAX_STATS[statIndex].source}</small>
+            </article>
 
             <div className="home-actions">
-              <button type="button" className="btn-blue wide" disabled={!ready || busy} onClick={beginScanFlow}>
-                {quizDone ? 'Fortsæt til kamera' : 'Start spørgeskema'}
+              <button type="button" className="btn-blue wide" onClick={nextStat}>
+                {statIndex === LOOKSMAX_STATS.length - 1 ? 'Næste · spørgsmål' : 'Næste'}
               </button>
-              <div className="home-actions row">
-                <button type="button" className="btn-dark" onClick={() => go('stats')}>
-                  Se alle stats
-                </button>
-                <button type="button" className="btn-dark" disabled={!ready || busy} onClick={() => void useSamples()}>
-                  Prøv eksempel
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn-dark wide"
+                onClick={prevStat}
+                disabled={statIndex === 0}
+              >
+                Tilbage
+              </button>
             </div>
-            {quizDone ? (
-              <div className="summary-chips">
-                {QUIZ_QUESTIONS.slice(0, 3).map((q) => (
-                  <span key={q.id}>{quizLabel(q.id, answers[q.id])}</span>
-                ))}
-              </div>
-            ) : null}
             <p className={`status${error ? ' error' : ''}`}>{error ?? status}</p>
             <p className="disclaimer">
-              PSL/looksmax-tal er indsamlet fra offentlige artikler og studier (TikTok-hashtags, Google-
-              søgeinteresse). Skalaen er community-baseret — ikke et videnskabeligt skønhedsmål.
+              Tal fra offentlige kilder (TikTok-hashtags, Google-søgeinteresse). PSL er
+              community-baseret — ikke videnskab.
             </p>
           </section>
         ) : null}
