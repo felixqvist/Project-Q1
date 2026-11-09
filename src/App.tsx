@@ -424,6 +424,11 @@ export default function App() {
                 )}
               </div>
               <div className="psl-angle-chip">{activeAngle === 'front' ? 'FRONT' : 'SIDE'}</div>
+              <div className="psl-guide-hint">
+                {activeAngle === 'front'
+                  ? 'Align face inside the oval'
+                  : 'Align profile inside the outline'}
+              </div>
             </div>
             <div className="psl-dots" aria-hidden="true">
               <i className={activeAngle === 'front' ? 'on' : ''} />

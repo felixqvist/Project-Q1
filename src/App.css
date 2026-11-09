@@ -88,8 +88,8 @@
 }
 
 .psl-guide {
-  filter: brightness(0.78) saturate(0.9);
-  opacity: 0.95;
+  filter: brightness(1.05) saturate(1.05) contrast(1.05);
+  opacity: 1;
 }
 
 .psl-live {
@@ -112,37 +112,86 @@
   place-items: center;
 }
 
+.psl-face-oval,
+.psl-face-profile {
+  position: relative;
+  box-sizing: border-box;
+}
+
 .psl-face-oval {
-  width: min(68%, 250px);
-  height: min(74%, 340px);
-  border: 2.5px dashed rgba(103, 232, 249, 0.95);
+  width: min(70%, 268px);
+  height: min(76%, 360px);
+  border: 3px solid rgba(165, 243, 252, 0.98);
   border-radius: 50%;
   box-shadow:
-    0 0 0 999px rgba(0, 0, 0, 0.42),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  animation: guidePulse 2.4s ease-in-out infinite;
+    0 0 0 999px rgba(0, 0, 0, 0.28),
+    0 0 0 3px rgba(8, 145, 178, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  animation: guidePulse 2.2s ease-in-out infinite;
+}
+
+.psl-face-oval::before,
+.psl-face-oval::after,
+.psl-face-profile::before,
+.psl-face-profile::after {
+  content: '';
+  position: absolute;
+  background: rgba(165, 243, 252, 0.9);
+}
+
+/* Crosshair ticks so placement is obvious */
+.psl-face-oval::before,
+.psl-face-profile::before {
+  top: -10px;
+  left: 50%;
+  width: 2px;
+  height: 18px;
+  transform: translateX(-50%);
+}
+
+.psl-face-oval::after,
+.psl-face-profile::after {
+  left: -10px;
+  top: 50%;
+  width: 18px;
+  height: 2px;
+  transform: translateY(-50%);
 }
 
 .psl-face-profile {
-  width: min(58%, 210px);
-  height: min(76%, 350px);
-  border: 2.5px dashed rgba(103, 232, 249, 0.95);
-  border-radius: 42% 58% 48% 52% / 36% 40% 60% 64%;
-  transform: translateX(10%);
+  width: min(56%, 220px);
+  height: min(78%, 370px);
+  border: 3px solid rgba(165, 243, 252, 0.98);
+  border-radius: 38% 62% 48% 52% / 32% 38% 62% 68%;
+  transform: translateX(12%);
   box-shadow:
-    0 0 0 999px rgba(0, 0, 0, 0.42),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  animation: guidePulse 2.4s ease-in-out infinite;
+    0 0 0 999px rgba(0, 0, 0, 0.28),
+    0 0 0 3px rgba(8, 145, 178, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  animation: guidePulse 2.2s ease-in-out infinite;
 }
 
-.psl-viewport.side .psl-face-profile {
-  border-color: rgba(34, 211, 238, 0.95);
+.psl-guide-hint {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #e0f2fe;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 @keyframes guidePulse {
   0%,
   100% {
-    opacity: 0.82;
+    opacity: 0.88;
   }
   50% {
     opacity: 1;
