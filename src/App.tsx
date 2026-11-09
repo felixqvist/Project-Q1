@@ -395,22 +395,6 @@ export default function App() {
     await startCameraFor(angle, next)
   }
 
-  async function useSamples() {
-    if (!QUIZ_QUESTIONS.every((q) => answers[q.id])) {
-      beginScanFlow()
-      return
-    }
-    await stopCamera()
-    setPage('scan')
-    setResult(null)
-    setError(null)
-    setFront('/sample-front.jpg')
-    setSide('/sample-side.jpg')
-    setStep('side')
-    setStatus('Kører eksempel…')
-    await runCombined('/sample-front.jpg', '/sample-side.jpg')
-  }
-
   async function runCombined(frontSrc: string, sideSrc: string) {
     if (!ready) {
       setError('Modellen er ikke klar endnu.')
