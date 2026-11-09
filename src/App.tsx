@@ -573,7 +573,7 @@ export default function App() {
 
         {page === 'about' ? (
           <section className="content-shell">
-            <p className="eyebrow">SPEJL</p>
+            <p className="eyebrow">AI PSL SCAN</p>
             <h1>About us</h1>
             <p className="lede">
               Modern looksmax scanner: cinematic intro, PSL context, profile intake, then front +
