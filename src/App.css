@@ -131,8 +131,12 @@
 .shot-frame img {
   width: 100%;
   height: 100%;
+  /* Crop the baked-in Next from the screenshot so only the real button shows */
   object-fit: cover;
-  object-position: center top;
+  object-position: center 8%;
+  transform: scale(1.02);
+  transform-origin: center top;
+  clip-path: inset(0 0 11% 0);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -156,8 +160,8 @@
   right: 0;
   bottom: 0;
   z-index: 3;
-  padding: 0.85rem 1rem calc(0.95rem + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.72) 42%, #000 100%);
+  padding: 1.1rem 1rem calc(1.05rem + env(safe-area-inset-bottom, 0px));
+  background: #000;
   pointer-events: none;
 }
 
