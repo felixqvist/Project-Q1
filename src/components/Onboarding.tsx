@@ -417,6 +417,7 @@ export default function Onboarding({ ready, onComplete }: Props) {
           progress={stepIndex}
           total={STEPS.length}
         >
+          <p className="ob-sub idol-sub">Pick a famous look — 12 elite references.</p>
           <div className="idol-grid">
             {IDOLS.map((idol) => (
               <button
@@ -425,7 +426,7 @@ export default function Onboarding({ ready, onComplete }: Props) {
                 className={`idol-card${answers.idol === idol.id ? ' selected' : ''}`}
                 onClick={() => patch({ idol: idol.id })}
               >
-                <img src={idol.img} alt={idol.name} />
+                <img src={idol.img} alt={idol.name} loading="lazy" />
                 <span>{idol.name}</span>
               </button>
             ))}

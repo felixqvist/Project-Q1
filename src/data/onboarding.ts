@@ -8,7 +8,13 @@ export type IdolId =
   | 'clark-kent'
   | 'timothee'
   | 'brad-pitt'
+  | 'chris-hemsworth'
+  | 'cillian-murphy'
+  | 'jacob-elordi'
+  | 'austin-butler'
   | 'zendaya'
+  | 'ana-de-armas'
+  | 'sydney-sweeney'
 
 export type OnboardingAnswers = {
   name: string
@@ -48,9 +54,15 @@ export const IDOLS: { id: IdolId; name: string; img: string }[] = [
   { id: 'henry-cavill', name: 'Henry Cavill', img: '/idols/henry.jpg' },
   { id: 'jordan-barrett', name: 'Jordan Barrett', img: '/idols/jordan.jpg' },
   { id: 'clark-kent', name: 'Clark Kent', img: '/idols/clark.jpg' },
-  { id: 'timothee', name: 'Timothée Chalamet', img: '/idols/timothee.jpg' },
+  { id: 'chris-hemsworth', name: 'Chris Hemsworth', img: '/idols/hemsworth.jpg' },
+  { id: 'jacob-elordi', name: 'Jacob Elordi', img: '/idols/elordi.jpg' },
+  { id: 'cillian-murphy', name: 'Cillian Murphy', img: '/idols/cillian.jpg' },
   { id: 'brad-pitt', name: 'Brad Pitt', img: '/idols/brad.jpg' },
+  { id: 'austin-butler', name: 'Austin Butler', img: '/idols/austin.jpg' },
+  { id: 'timothee', name: 'Timothée Chalamet', img: '/idols/timothee.jpg' },
   { id: 'zendaya', name: 'Zendaya', img: '/idols/zendaya.jpg' },
+  { id: 'ana-de-armas', name: 'Ana de Armas', img: '/idols/ana.jpg' },
+  { id: 'sydney-sweeney', name: 'Sydney Sweeney', img: '/idols/sydney.jpg' },
 ]
 
 export function isAdult(answers: OnboardingAnswers): boolean {

@@ -857,10 +857,14 @@
 .idol-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.45rem;
+  gap: 0.5rem;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   flex: 1;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .idol-card {
@@ -954,6 +958,11 @@
   margin: 0;
   color: #9aa3b2;
   line-height: 1.45;
+}
+
+.idol-sub {
+  margin: -0.35rem 0 0.15rem;
+  font-size: 0.88rem;
 }
 
 .ob-error {
