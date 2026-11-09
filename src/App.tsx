@@ -375,7 +375,7 @@ export default function App() {
 
         {page === 'scan' && (step === 'front' || step === 'side') ? (
           <section className="psl-scan">
-            <h1>PSL Face Scan</h1>
+            <h1>AI PSL Scan</h1>
             <div className="psl-trust">
               <p>
                 <span aria-hidden="true">🔒</span> Your privacy is our priority
@@ -389,21 +389,41 @@ export default function App() {
                 ? 'Face forward, neutral expression, good lighting'
                 : 'Side profile, show jawline and facial structure'}
             </p>
-            <div className={`psl-viewport ${activeAngle}${busy ? ' scanning' : ''}`}>
-              <img
-                className="psl-guide"
-                src={activeAngle === 'front' ? '/guides/front-guide.jpg' : '/guides/side-guide.jpg'}
-                alt=""
-                draggable={false}
-              />
+            <div
+              className={`psl-viewport ${activeAngle}${busy ? ' scanning' : ''}${
+                cameraOn || (activeAngle === 'front' ? frontUrl : sideUrl) ? ' live' : ''
+              }`}
+            >
+              {/* Reference pose only when camera is not live */}
+              {!cameraOn && !(activeAngle === 'front' ? frontUrl : sideUrl) ? (
+                <img
+                  className="psl-guide"
+                  src={activeAngle === 'front' ? '/guides/front-guide.jpg' : '/guides/side-guide.jpg'}
+                  alt=""
+                  draggable={false}
+                />
+              ) : null}
               {cameraOn ? (
-                <video ref={videoRef} className="psl-live" playsInline muted autoPlay />
+                <video
+                  ref={videoRef}
+                  className={`psl-live${facingMode === 'user' ? ' mirror' : ''}`}
+                  playsInline
+                  muted
+                  autoPlay
+                />
               ) : activeAngle === 'front' && frontUrl ? (
                 <img className="psl-live" src={frontUrl} alt="Front capture" />
               ) : activeAngle === 'side' && sideUrl ? (
                 <img className="psl-live" src={sideUrl} alt="Side capture" />
               ) : null}
-              <div className="psl-angle-label">{activeAngle === 'front' ? 'FRONT' : 'SIDE'}</div>
+              <div className="psl-face-guide" aria-hidden="true">
+                {activeAngle === 'front' ? (
+                  <div className="psl-face-oval" />
+                ) : (
+                  <div className="psl-face-profile" />
+                )}
+              </div>
+              <div className="psl-angle-chip">{activeAngle === 'front' ? 'FRONT' : 'SIDE'}</div>
             </div>
             <div className="psl-dots" aria-hidden="true">
               <i className={activeAngle === 'front' ? 'on' : ''} />

@@ -74,7 +74,8 @@
   aspect-ratio: 4 / 5;
   border-radius: 22px;
   overflow: hidden;
-  background: #111;
+  background: #0a0a0a;
+  border: 1px solid rgba(103, 232, 249, 0.28);
 }
 
 .psl-guide,
@@ -87,30 +88,82 @@
 }
 
 .psl-guide {
-  filter: brightness(0.72) saturate(0.85);
+  filter: brightness(0.78) saturate(0.9);
+  opacity: 0.95;
 }
 
 .psl-live {
-  opacity: 0.55;
-  mix-blend-mode: screen;
+  z-index: 1;
+  opacity: 1;
+  mix-blend-mode: normal;
+  background: #000;
 }
 
-.psl-viewport:not(:has(.psl-live)) .psl-guide {
-  filter: brightness(0.78);
+.psl-live.mirror {
+  transform: scaleX(-1);
 }
 
-.psl-angle-label {
+.psl-face-guide {
   position: absolute;
   inset: 0;
+  z-index: 3;
+  pointer-events: none;
   display: grid;
   place-items: center;
-  font-size: clamp(2.4rem, 12vw, 3.2rem);
+}
+
+.psl-face-oval {
+  width: min(68%, 250px);
+  height: min(74%, 340px);
+  border: 2.5px dashed rgba(103, 232, 249, 0.95);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 999px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  animation: guidePulse 2.4s ease-in-out infinite;
+}
+
+.psl-face-profile {
+  width: min(58%, 210px);
+  height: min(76%, 350px);
+  border: 2.5px dashed rgba(103, 232, 249, 0.95);
+  border-radius: 42% 58% 48% 52% / 36% 40% 60% 64%;
+  transform: translateX(10%);
+  box-shadow:
+    0 0 0 999px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  animation: guidePulse 2.4s ease-in-out infinite;
+}
+
+.psl-viewport.side .psl-face-profile {
+  border-color: rgba(34, 211, 238, 0.95);
+}
+
+@keyframes guidePulse {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.psl-angle-chip {
+  position: absolute;
+  top: 0.85rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(103, 232, 249, 0.5);
+  color: #67e8f9;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #fff;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
+  letter-spacing: 0.14em;
   pointer-events: none;
-  z-index: 2;
 }
 
 .psl-dots {
