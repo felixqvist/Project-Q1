@@ -148,7 +148,7 @@ export default function Onboarding({ ready, onComplete }: Props) {
     <div className={`onboard step-${step}`}>
       {step === 'landing' ? (
         <section className="landing-hero">
-          <div className="landing-video-wrap">
+          <div className="landing-stage" aria-hidden="true">
             <video
               className="landing-video"
               src="/video/looksmax-loop.mp4"
@@ -158,12 +158,24 @@ export default function Onboarding({ ready, onComplete }: Props) {
               playsInline
               poster="/video/looksmax-poster.jpg"
             />
+            <div className="landing-veil" />
+            <div className="landing-grain" />
+            <div className="landing-glow" />
           </div>
-          <div className="landing-copy">
-            <p className="landing-tagline">become the best looking version of yourself</p>
+          <div className="landing-frame">
+            <p className="landing-kicker">
+              <span>PSL</span>
+              <i />
+              <span>FACE ARCHITECTURE</span>
+            </p>
+            <h1 className="landing-brand">
+              SPE<span>JL</span>
+            </h1>
+            <p className="landing-line">become the best looking version of yourself</p>
             <button type="button" className="btn-get-started" onClick={goNext} disabled={!ready}>
-              get started
+              {ready ? 'Get started' : 'Loading…'}
             </button>
+            <p className="landing-trust">Private · on-device scan · 10,000+ ratings</p>
           </div>
         </section>
       ) : null}
