@@ -9,10 +9,20 @@ import {
 } from './lib/faceAnalysis'
 import { LOOKSMAX_STATS, PSL_TIERS } from './data/stats'
 import { QUIZ_QUESTIONS } from './data/quiz'
+import { HypergamySlide, PslScaleSlide } from './components/IntroSlides'
 import './App.css'
 
 type Page = 'scan' | 'stats' | 'account' | 'profile' | 'faq' | 'about'
-type ScanStep = 'landing' | 'home' | 'quiz' | 'front' | 'side' | 'result' | 'flaws'
+type ScanStep =
+  | 'landing'
+  | 'hypergamy'
+  | 'psl'
+  | 'home'
+  | 'quiz'
+  | 'front'
+  | 'side'
+  | 'result'
+  | 'flaws'
 
 type Profile = { name: string; email: string }
 
@@ -331,7 +341,7 @@ export default function App() {
     setPage('scan')
     setStatIndex(0)
     setError(null)
-    setStep('home')
+    setStep('hypergamy')
   }
 
   function openUpload(angle: CaptureAngle) {
@@ -484,10 +494,15 @@ export default function App() {
   const overall100 = result ? scoreTo100(result.overall) : 0
   const ringColor =
     overall100 >= 75 ? 'var(--blue)' : overall100 >= 60 ? 'var(--orange)' : 'var(--red)'
-  const showChrome = !(page === 'scan' && step === 'landing')
+  const eduMode = page === 'scan' && (step === 'landing' || step === 'hypergamy' || step === 'psl')
+  const showChrome = !eduMode
 
   return (
-    <div className={`app${page === 'scan' && step === 'landing' ? ' landing-mode' : ''}`}>
+    <div
+      className={`app${step === 'landing' && page === 'scan' ? ' landing-mode' : ''}${
+        page === 'scan' && (step === 'hypergamy' || step === 'psl') ? ' edu-mode' : ''
+      }`}
+    >
       {showChrome ? (
       <header className="nav">
         <button type="button" className="brand" onClick={() => void resetScan()}>
@@ -535,7 +550,13 @@ export default function App() {
       </header>
       ) : null}
 
-      <main className={`main${page === 'scan' && step === 'landing' ? ' main-landing' : ''}`}>
+      <main
+        className={`main${
+          page === 'scan' && (step === 'landing' || step === 'hypergamy' || step === 'psl')
+            ? ' main-landing'
+            : ''
+        }`}
+      >
         {page === 'scan' && step === 'landing' ? (
           <section className="landing-hero">
             <div className="landing-video-wrap">
@@ -556,6 +577,14 @@ export default function App() {
               </button>
             </div>
           </section>
+        ) : null}
+
+        {page === 'scan' && step === 'hypergamy' ? (
+          <HypergamySlide onBack={() => setStep('landing')} onNext={() => setStep('psl')} />
+        ) : null}
+
+        {page === 'scan' && step === 'psl' ? (
+          <PslScaleSlide onBack={() => setStep('hypergamy')} onNext={startQuiz} />
         ) : null}
 
         {page === 'scan' && step === 'home' ? (
