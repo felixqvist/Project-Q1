@@ -279,14 +279,16 @@ export default function App() {
   }
 
   async function resetScan() {
+    // Keep onboarding answers — only retake photos
     await stopCamera()
     setResult(null)
     setError(null)
     setFront(null)
     setSide(null)
-    setStep('onboarding')
+    setAnalyzeProgress(0)
     setPage('scan')
-    setStatus(ready ? 'Ready' : 'Loading…')
+    setStep('front')
+    setStatus(ready ? 'Ready — retake front photo' : 'Loading…')
   }
 
   function saveAccount(e: FormEvent) {

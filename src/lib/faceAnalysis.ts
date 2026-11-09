@@ -107,6 +107,17 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10
 }
 
+/**
+ * Map a 0–1 quality signal to a harsh 1–10 PSL-style grade.
+ * A true 10 needs near-perfect landmarks/pose — AI-perfect faces only.
+ */
+function grade(quality: number, floor = 2.0, ceil = 9.4): number {
+  const q = clamp(quality, 0, 1)
+  // Concave curve: mid scores sit lower; top is rare
+  const curved = Math.pow(q, 1.45)
+  return round1(floor + curved * (ceil - floor))
+}
+
 function mid(
   a: NormalizedLandmark,
   b: NormalizedLandmark,
@@ -248,7 +259,7 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
     symError += Math.abs(leftOff - rightOff) / faceWidth + yDiff / faceHeight
   }
   symError /= pairs.length
-  const symmetry = round1(4 + clamp(1 - symError * 4.2, 0.15, 1) * 6)
+  const symmetry = grade(clamp(1 - symError * 5.4, 0, 1))
 
   const browY = (L_BROW.y + R_BROW.y) / 2
   const noseBaseY = face[2].y
@@ -258,28 +269,26 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
   const avgThird = thirds.reduce((a, c) => a + c, 0) / thirds.length
   const thirdsVar =
     thirds.reduce((s, t) => s + Math.abs(t - avgThird), 0) / (avgThird * thirds.length)
-  const ratioScore = 1 - clamp(Math.abs(faceHeight / faceWidth - 1.4) / 0.45, 0, 1)
-  const proportions = round1(
-    4 + (clamp(1 - thirdsVar * 2.8, 0, 1) * 0.55 + ratioScore * 0.45) * 6,
+  const ratioScore = 1 - clamp(Math.abs(faceHeight / faceWidth - 1.38) / 0.38, 0, 1)
+  const proportions = grade(
+    clamp(1 - thirdsVar * 3.4, 0, 1) * 0.55 + ratioScore * 0.45,
   )
 
   const eyeSpacing = dist(L_EYE_OUTER, R_EYE_OUTER) / faceWidth
-  const spacingScore = 1 - clamp(Math.abs(eyeSpacing - 0.5) / 0.22, 0, 1)
+  const spacingScore = 1 - clamp(Math.abs(eyeSpacing - 0.48) / 0.18, 0, 1)
   const lOpen = dist(L_EYE_TOP, L_EYE_BOT)
   const rOpen = dist(R_EYE_TOP, R_EYE_BOT)
   const openSym = 1 - clamp(Math.abs(lOpen - rOpen) / ((lOpen + rOpen) / 2 + 1e-6), 0, 1)
-  const eyeBalance = round1(4 + (spacingScore * 0.6 + openSym * 0.4) * 6)
+  const eyeBalance = grade(spacingScore * 0.6 + openSym * 0.4)
 
   const eyeMid = mid(L_EYE_OUTER, R_EYE_OUTER)
   const mouthMid = mid(L_MOUTH, R_MOUTH)
   const poseSkew = Math.abs(eyeMid.x - mouthMid.x) / faceWidth
-  const frontality = clamp(1 - poseSkew * 6, 0.2, 1)
+  const frontality = clamp(1 - poseSkew * 7, 0.1, 1)
   const mouthOpen = dist(MOUTH_TOP, MOUTH_BOT) / faceHeight
-  const expressionCalm = clamp(1 - Math.abs(mouthOpen - 0.02) / 0.08, 0.3, 1)
-  const frontalBonus = clamp(1 - Math.abs(b.yaw) / 0.18, 0.35, 1)
-  const presence = round1(
-    4.2 + (frontality * 0.45 + expressionCalm * 0.2 + frontalBonus * 0.35) * 5.5,
-  )
+  const expressionCalm = clamp(1 - Math.abs(mouthOpen - 0.02) / 0.07, 0.2, 1)
+  const frontalBonus = clamp(1 - Math.abs(b.yaw) / 0.14, 0.2, 1)
+  const presence = grade(frontality * 0.45 + expressionCalm * 0.2 + frontalBonus * 0.35)
 
   return [
     {
@@ -344,32 +353,32 @@ function scoreSideFromLandmarks(face: NormalizedLandmark[], yaw: number): ScoreF
   const R_CHEEK = face[454]
 
   const absYaw = Math.abs(yaw)
-  const profileAngle = clamp((absYaw - 0.06) / 0.28, 0, 1)
+  const profileAngle = clamp((absYaw - 0.08) / 0.32, 0, 1)
   const eyeCollapse = clamp((0.48 - eyeSpan) / 0.25, 0, 1)
   const angleRaw = profileAngle * 0.65 + eyeCollapse * 0.35
-  const profilePresence = round1(4 + angleRaw * 6)
+  const profilePresence = grade(angleRaw)
 
   const chordX =
     NOSE_BRIDGE.x +
     ((NOSE_TIP.y - NOSE_BRIDGE.y) / (CHIN.y - NOSE_BRIDGE.y + 1e-6)) * (CHIN.x - NOSE_BRIDGE.x)
   const projection = Math.abs(NOSE_TIP.x - chordX) / (faceWidth + 1e-6)
   const zPush = Math.abs((NOSE_TIP.z ?? 0) - (NOSE_BRIDGE.z ?? 0))
-  const noseRaw = clamp(projection * 3.2 + zPush * 1.4, 0.15, 1)
+  const noseRaw = clamp(projection * 3.6 + zPush * 1.6, 0.1, 1)
 
   const jawWidth = dist(L_JAW, R_JAW)
   const jawRatio = jawWidth / (faceHeight + 1e-6)
   const chinDrop = (CHIN.y - NOSE_BASE.y) / (faceHeight + 1e-6)
-  const jawShape = 1 - clamp(Math.abs(jawRatio - 0.55) / 0.35, 0, 1)
-  const chinShape = 1 - clamp(Math.abs(chinDrop - 0.28) / 0.22, 0, 1)
+  const jawShape = 1 - clamp(Math.abs(jawRatio - 0.52) / 0.3, 0, 1)
+  const chinShape = 1 - clamp(Math.abs(chinDrop - 0.27) / 0.18, 0, 1)
   const cheekEdge =
     Math.max(Math.abs(L_CHEEK.x - NOSE_TIP.x), Math.abs(R_CHEEK.x - NOSE_TIP.x)) /
     (faceWidth + 1e-6)
-  const edgeClarity = clamp(cheekEdge / 0.55, 0.2, 1)
-  const jawline = round1(4 + (jawShape * 0.4 + chinShape * 0.35 + edgeClarity * 0.25) * 6)
+  const edgeClarity = clamp(cheekEdge / 0.58, 0.15, 1)
+  const jawline = grade(jawShape * 0.4 + chinShape * 0.35 + edgeClarity * 0.25)
 
   const silhouette =
-    1 - clamp(Math.abs(FOREHEAD.x - CHIN.x) / (faceWidth * 0.55 + 1e-6), 0, 1)
-  const profileHarmony = round1(4 + (noseRaw * 0.35 + angleRaw * 0.35 + silhouette * 0.3) * 6)
+    1 - clamp(Math.abs(FOREHEAD.x - CHIN.x) / (faceWidth * 0.5 + 1e-6), 0, 1)
+  const profileHarmony = grade(noseRaw * 0.35 + angleRaw * 0.35 + silhouette * 0.3)
 
   return sideFactorRows(profileHarmony, jawline, profilePresence, absYaw, eyeCollapse)
 }
@@ -396,9 +405,9 @@ function scoreSideFromDetection(snap: AngleSnapshot, detection: Detection): Scor
     noseRaw = clamp(noseOff * 1.4 + stack * 0.5, 0.2, 1)
   }
 
-  const profileHarmony = round1(4.2 + (profileShape * 0.45 + noseRaw * 0.35 + conf * 0.2) * 5.5)
-  const jawline = round1(4 + (profileShape * 0.55 + conf * 0.45) * 5.8)
-  const presence = round1(4.5 + (clamp(absYaw / 0.45, 0.2, 1) * 0.5 + conf * 0.5) * 5.2)
+  const profileHarmony = grade(profileShape * 0.45 + noseRaw * 0.35 + conf * 0.2)
+  const jawline = grade(profileShape * 0.55 + conf * 0.45)
+  const presence = grade(clamp(absYaw / 0.45, 0.15, 1) * 0.5 + conf * 0.5)
 
   return sideFactorRows(profileHarmony, jawline, presence, absYaw, profileShape)
 }
@@ -483,16 +492,18 @@ function combineScores(
     weightSum += adj
   }
 
-  const overall = round1(clamp((weighted / weightSum) * 0.92 + 0.55, 1, 10))
+  // Strict PSL: ~1–2 lower than a soft curve; a true 10 is reserved for near-perfect.
+  const raw = weighted / weightSum
+  const overall = round1(clamp(raw - 0.55, 1, 9.6))
   const weakest = [...factors].sort((a, b) => a.score - b.score)[0]
   const tip =
-    overall >= 8.5
-      ? 'Front og side spiller godt sammen — behold lignende lys til begge vinkler.'
+    overall >= 8
+      ? 'Stærkt scan — men 10 kræver næsten perfekt lys, vinkel og knoglelæsning.'
       : weakest.source === 'side'
-        ? 'Tip: tag sidebilledet i ren profil med blødt lys fra forsiden af ansigtet.'
+        ? 'Tag sidebilledet lige fra siden med blødt lys foran ansigtet.'
         : weakest.key === 'symmetry'
-          ? 'Tip: ret frontbilledet, så begge sider af ansigtet får samme lys.'
-          : 'Tip: front lige ind i linsen, side ca. 90° — begge skarpe og godt belyste.'
+          ? 'Tag frontbilledet lige forfra med samme lys på begge kinder.'
+          : 'Front lige ind i kameraet, side ca. 90° — begge skarpe og godt belyste.'
 
   return { overall, factors, tip, front, side }
 }

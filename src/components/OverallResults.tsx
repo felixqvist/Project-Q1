@@ -45,7 +45,6 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
   }, [index, categories.length])
 
   function onPointerDown(e: ReactPointerEvent) {
-    // Don't steal taps on buttons
     if ((e.target as HTMLElement).closest('button')) return
     swiping.current = true
     startX.current = e.clientX
@@ -76,7 +75,6 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
     preferredMarks.length > 0 ? preferred : preferred === 'side' ? 'front' : 'side'
   const useUrl = useSide === 'side' ? sideUrl : frontUrl
   const useMarks = detailMarks.filter((m) => m.photo === useSide)
-  // Keep list order aligned with numbered markers on the photo
   const slideSubs = useMarks
     .map((m) => current.subs.find((s) => s.id === m.id))
     .filter((s): s is NonNullable<typeof s> => !!s)
@@ -86,16 +84,13 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
     <section className="results-screen simple" aria-label="Scan results">
       <header className="results-top">
         <p className="results-kicker">
-          {index + 1} / {categories.length} · {answers.name.trim() || 'Your'} scan
+          {index + 1} / {categories.length} · {answers.name.trim() || 'Din'} scan
         </p>
         <h1 className="results-title">{current.label}</h1>
-        <div className={`results-score ${scoreTone(current.score)}`}>
-          <strong>{current.score.toFixed(1)}</strong>
-          <span>/ 10</span>
-        </div>
+        <ScoreCircle score={current.score} size="lg" />
         <p className="results-blurb">
           {current.id === 'overall'
-            ? 'Your total score. Swipe → to see each area on your photo.'
+            ? 'Din samlede score. Swipe → for at se hvert område på billedet.'
             : current.blurb}
         </p>
       </header>
@@ -121,7 +116,7 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
             </div>
 
             <div className="results-simple-list">
-              <p className="results-list-title">Areas · tap or swipe →</p>
+              <p className="results-list-title">Områder · tryk eller swipe →</p>
               {categories
                 .filter((c) => c.id !== 'overall')
                 .map((c, i) => (
@@ -132,7 +127,7 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
                     onClick={() => go(i + 1)}
                   >
                     <span className="results-row-name">{prettyLabel(c)}</span>
-                    <strong>{c.score.toFixed(1)}</strong>
+                    <ScoreCircle score={c.score} size="sm" />
                     <span className="results-row-go" aria-hidden="true">
                       ›
                     </span>
@@ -150,7 +145,7 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
               numbered
               limit={4}
             />
-            <p className="results-map-hint">Numbers on the photo match the list below</p>
+            <p className="results-map-hint">Tallene på billedet matcher listen nedenunder</p>
 
             <div className="results-simple-list">
               {slideSubs.map((sub, i) => (
@@ -158,13 +153,13 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
                   <div className="results-card-top">
                     <span className="results-card-num">{i + 1}</span>
                     <span className="results-card-name">{sub.label}</span>
-                    <strong>{sub.score.toFixed(1)}</strong>
+                    <ScoreCircle score={sub.score} size="sm" />
                   </div>
                   <p>
-                    <b>Problem</b> {shorten(sub.why)}
+                    <b>Hvad betyder det</b> {sub.why}
                   </p>
                   <p>
-                    <b>Fix</b> {shorten(sub.fix)}
+                    <b>Sådan forbedrer du det</b> {sub.fix}
                   </p>
                 </article>
               ))}
@@ -206,10 +201,19 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
       </nav>
 
       <button type="button" className="results-rescan" onClick={onRescan}>
-        Rescan
+        Retake photos
       </button>
-      <p className="disclaimer dark">AI estimate. Not a measure of your worth.</p>
+      <p className="disclaimer dark">AI-estimat. Ikke et mål for din værdi.</p>
     </section>
+  )
+}
+
+function ScoreCircle({ score, size }: { score: number; size: 'sm' | 'lg' }) {
+  const tone = scoreTone(score)
+  return (
+    <div className={`score-circle ${tone} ${size}`} aria-label={`Score ${score.toFixed(1)} of 10`}>
+      <strong>{score.toFixed(1)}</strong>
+    </div>
   )
 }
 
@@ -219,11 +223,4 @@ function prettyLabel(c: CategoryRating) {
   if (c.id === 'psl') return 'PSL'
   if (c.id === 'potential') return 'Potential'
   return c.label.charAt(0) + c.label.slice(1).toLowerCase()
-}
-
-function shorten(text: string, max = 110) {
-  if (text.length <= max) return text
-  const cut = text.slice(0, max)
-  const last = cut.lastIndexOf(' ')
-  return `${cut.slice(0, last > 60 ? last : max)}…`
 }
