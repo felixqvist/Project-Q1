@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   DAYS,
   EMPTY_ANSWERS,
@@ -49,7 +49,35 @@ export default function Onboarding({ ready, onComplete }: Props) {
   const adult = useMemo(() => isAdult(answers), [answers])
   const stepIndex = STEPS.indexOf(step)
 
-  function patch( partial: Partial<OnboardingAnswers>) {
+  // Lock page scroll + block browser/history back during the linear onboarding flow.
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const prevHtmlOverflow = html.style.overflow
+    const prevBodyOverflow = body.style.overflow
+    const prevHtmlOverscroll = html.style.overscrollBehavior
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    html.style.overscrollBehavior = 'none'
+
+    const lockKey = 'spejl-ob-lock'
+    if (!window.history.state?.[lockKey]) {
+      window.history.pushState({ [lockKey]: true }, '')
+    }
+    const onPop = () => {
+      window.history.pushState({ [lockKey]: true }, '')
+    }
+    window.addEventListener('popstate', onPop)
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow
+      body.style.overflow = prevBodyOverflow
+      html.style.overscrollBehavior = prevHtmlOverscroll
+      window.removeEventListener('popstate', onPop)
+    }
+  }, [])
+
+  function patch(partial: Partial<OnboardingAnswers>) {
     setAnswers((prev) => ({ ...prev, ...partial }))
     setError(null)
   }
@@ -435,6 +463,7 @@ function ScreenshotSlide({
     <section className="shot-slide">
       <div className="shot-frame">
         <img src={src} alt={alt} draggable={false} />
+        <div className="shot-back-block" aria-hidden="true" />
         <button type="button" className="shot-next-hit" onClick={onNext} aria-label="Next" />
       </div>
       <button type="button" className="btn-next-white shot-next-fallback" onClick={onNext}>
