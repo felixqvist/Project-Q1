@@ -541,16 +541,20 @@
 
 .landing-brand-scan {
   display: inline-block;
-  color: #67e8f9;
-  font-size: 1.28em;
+  color: #ffffff;
+  font-size: 1.42em;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  text-shadow:
-    0 0 24px rgba(103, 232, 249, 0.45),
-    0 8px 28px rgba(0, 0, 0, 0.45);
-  border-bottom: 3px solid rgba(103, 232, 249, 0.85);
-  padding-bottom: 0.08em;
+  background: linear-gradient(180deg, #ffffff 35%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.5px rgba(103, 232, 249, 0.55);
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 10px 28px rgba(0, 0, 0, 0.55));
+  border-bottom: 4px solid #67e8f9;
+  padding: 0 0.08em 0.1em;
+  margin-top: 0.08em;
 }
 
 .landing-line {
