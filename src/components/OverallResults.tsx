@@ -156,10 +156,10 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
                     <ScoreCircle score={sub.score} size="sm" />
                   </div>
                   <p>
-                    <b>Hvad betyder det</b> {sub.why}
+                    <b>Hvorfor scoren er her</b> {sub.why}
                   </p>
                   <p>
-                    <b>Sådan forbedrer du det</b> {sub.fix}
+                    <b>Sådan hæver du PSL</b> {sub.fix}
                   </p>
                 </article>
               ))}

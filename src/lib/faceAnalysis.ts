@@ -108,13 +108,13 @@ function round1(n: number): number {
 }
 
 /**
- * Map a 0–1 quality signal to a harsh 1–10 PSL-style grade.
- * A true 10 needs near-perfect landmarks/pose — AI-perfect faces only.
+ * Map a 0–1 quality signal to a harsh PSL-style grade.
+ * A true 10 is reserved for near-perfect bone + harmony reads.
  */
-function grade(quality: number, floor = 2.0, ceil = 9.4): number {
+function grade(quality: number, floor = 1.6, ceil = 8.9): number {
   const q = clamp(quality, 0, 1)
-  // Concave curve: mid scores sit lower; top is rare
-  const curved = Math.pow(q, 1.45)
+  // Steeper concave curve — average faces land mid/low; elite is rare
+  const curved = Math.pow(q, 1.75)
   return round1(floor + curved * (ceil - floor))
 }
 
@@ -259,7 +259,7 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
     symError += Math.abs(leftOff - rightOff) / faceWidth + yDiff / faceHeight
   }
   symError /= pairs.length
-  const symmetry = grade(clamp(1 - symError * 5.4, 0, 1))
+  const symmetry = grade(clamp(1 - symError * 6.2, 0, 1))
 
   const browY = (L_BROW.y + R_BROW.y) / 2
   const noseBaseY = face[2].y
@@ -269,26 +269,46 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
   const avgThird = thirds.reduce((a, c) => a + c, 0) / thirds.length
   const thirdsVar =
     thirds.reduce((s, t) => s + Math.abs(t - avgThird), 0) / (avgThird * thirds.length)
-  const ratioScore = 1 - clamp(Math.abs(faceHeight / faceWidth - 1.38) / 0.38, 0, 1)
+  // Ideal compact masculine/feminine harmonic band is narrow
+  const ratioScore = 1 - clamp(Math.abs(faceHeight / faceWidth - 1.35) / 0.28, 0, 1)
+  const cheekWidth = dist(L_CHEEK, R_CHEEK) / faceWidth
+  const jawWidthFront = dist(L_JAW, R_JAW) / faceWidth
+  const taper = clamp((cheekWidth - jawWidthFront + 0.08) / 0.22, 0, 1)
+  const midCompact = clamp(1 - Math.abs((noseBaseY - browY) / faceHeight - 0.32) / 0.14, 0, 1)
   const proportions = grade(
-    clamp(1 - thirdsVar * 3.4, 0, 1) * 0.55 + ratioScore * 0.45,
+    clamp(1 - thirdsVar * 4.1, 0, 1) * 0.35 +
+      ratioScore * 0.25 +
+      taper * 0.2 +
+      midCompact * 0.2,
   )
 
   const eyeSpacing = dist(L_EYE_OUTER, R_EYE_OUTER) / faceWidth
-  const spacingScore = 1 - clamp(Math.abs(eyeSpacing - 0.48) / 0.18, 0, 1)
+  const spacingScore = 1 - clamp(Math.abs(eyeSpacing - 0.46) / 0.14, 0, 1)
   const lOpen = dist(L_EYE_TOP, L_EYE_BOT)
   const rOpen = dist(R_EYE_TOP, R_EYE_BOT)
   const openSym = 1 - clamp(Math.abs(lOpen - rOpen) / ((lOpen + rOpen) / 2 + 1e-6), 0, 1)
-  const eyeBalance = grade(spacingScore * 0.6 + openSym * 0.4)
+  // Canthal tilt proxy: outer corner should sit slightly above inner
+  const lTilt = (L_EYE_OUTER.y - L_EYE_INNER.y) / faceHeight
+  const rTilt = (R_EYE_OUTER.y - R_EYE_INNER.y) / faceHeight
+  const tiltScore =
+    (clamp((-lTilt + 0.012) / 0.03, 0, 1) + clamp((-rTilt + 0.012) / 0.03, 0, 1)) / 2
+  const aperture = clamp(((lOpen + rOpen) / 2 / faceHeight - 0.028) / 0.03, 0, 1)
+  const eyeBalance = grade(
+    spacingScore * 0.3 + openSym * 0.2 + tiltScore * 0.3 + aperture * 0.2,
+  )
 
   const eyeMid = mid(L_EYE_OUTER, R_EYE_OUTER)
   const mouthMid = mid(L_MOUTH, R_MOUTH)
   const poseSkew = Math.abs(eyeMid.x - mouthMid.x) / faceWidth
-  const frontality = clamp(1 - poseSkew * 7, 0.1, 1)
+  const frontality = clamp(1 - poseSkew * 8, 0.05, 1)
   const mouthOpen = dist(MOUTH_TOP, MOUTH_BOT) / faceHeight
-  const expressionCalm = clamp(1 - Math.abs(mouthOpen - 0.02) / 0.07, 0.2, 1)
-  const frontalBonus = clamp(1 - Math.abs(b.yaw) / 0.14, 0.2, 1)
-  const presence = grade(frontality * 0.45 + expressionCalm * 0.2 + frontalBonus * 0.35)
+  const expressionCalm = clamp(1 - Math.abs(mouthOpen - 0.018) / 0.06, 0.15, 1)
+  const frontalBonus = clamp(1 - Math.abs(b.yaw) / 0.11, 0.1, 1)
+  const browStrength =
+    1 - clamp(Math.abs((browY - eyeMid.y) / faceHeight - 0.07) / 0.05, 0, 1)
+  const presence = grade(
+    frontality * 0.3 + expressionCalm * 0.15 + frontalBonus * 0.25 + browStrength * 0.3,
+  )
 
   return [
     {
@@ -297,11 +317,11 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
       score: symmetry,
       source: 'front',
       summary:
-        symmetry >= 8
-          ? 'Fin balance mellem venstre og højre side forfra.'
-          : symmetry >= 6.5
-            ? 'God front-symmetri med små, naturlige variationer.'
-            : 'Lidt asymmetri forfra — helt normalt, og ofte charmerende i bevægelse.',
+        symmetry >= 7.5
+          ? 'Meget jævn venstre/højre balance.'
+          : symmetry >= 5.5
+            ? 'Synlig asymmetri — trækker PSL ned.'
+            : 'Tydelig asymmetri i knogle/bløddele.',
     },
     {
       key: 'proportions',
@@ -309,11 +329,11 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
       score: proportions,
       source: 'front',
       summary:
-        proportions >= 8
-          ? 'Ansigtsproportionerne ligger tæt på harmoniske tredjedele.'
-          : proportions >= 6.5
-            ? 'Solide frontproportioner med et klart, læsbart udtryk.'
-            : 'Frontproportionerne kan fremstå stærkere med bedre lys og vinkel.',
+        proportions >= 7.5
+          ? 'Tredjedele og bredde ligger tæt på elite-båndet.'
+          : proportions >= 5.5
+            ? 'Proportionerne er middel — midface/taper kan løftes.'
+            : 'Lange/smalle eller ujævne tredjedele holder PSL nede.',
     },
     {
       key: 'eyeBalance',
@@ -321,11 +341,11 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
       score: eyeBalance,
       source: 'front',
       summary:
-        eyeBalance >= 8
-          ? 'Øjnene sidder harmonisk og giver et åbent blik.'
-          : eyeBalance >= 6.5
-            ? 'God øjenbalance — blikket bærer meget af indtrykket.'
-            : 'Kig lige ind i kameraet med blød belysning foran dig.',
+        eyeBalance >= 7.5
+          ? 'Stærk tilt, afstand og åbenhed.'
+          : eyeBalance >= 5.5
+            ? 'Øjne er okay, men tilt/åbenhed er ikke elite.'
+            : 'Svage øjne ift. PSL-standard (tilt, spacing eller aperture).',
     },
     {
       key: 'presence',
@@ -333,11 +353,11 @@ function scoreFrontFactors(face: NormalizedLandmark[]): ScoreFactor[] {
       score: presence,
       source: 'front',
       summary:
-        presence >= 8
-          ? 'Klar frontal pose — godt udgangspunkt for analysen.'
-          : presence >= 6.5
-            ? 'God front-presence; ret hovedet lidt mere frontalt hvis muligt.'
-            : 'Hold hovedet lige mod kameraet med jævnt lys i ansigtet.',
+        presence >= 7.5
+          ? 'Stærkt frontalt signal og brow support.'
+          : presence >= 5.5
+            ? 'Presence er middel — brow/frame kan skærpes.'
+            : 'Svagt frontalt signal ift. høje PSL-ansigter.',
     },
   ]
 }
@@ -353,8 +373,8 @@ function scoreSideFromLandmarks(face: NormalizedLandmark[], yaw: number): ScoreF
   const R_CHEEK = face[454]
 
   const absYaw = Math.abs(yaw)
-  const profileAngle = clamp((absYaw - 0.08) / 0.32, 0, 1)
-  const eyeCollapse = clamp((0.48 - eyeSpan) / 0.25, 0, 1)
+  const profileAngle = clamp((absYaw - 0.1) / 0.35, 0, 1)
+  const eyeCollapse = clamp((0.48 - eyeSpan) / 0.22, 0, 1)
   const angleRaw = profileAngle * 0.65 + eyeCollapse * 0.35
   const profilePresence = grade(angleRaw)
 
@@ -363,22 +383,28 @@ function scoreSideFromLandmarks(face: NormalizedLandmark[], yaw: number): ScoreF
     ((NOSE_TIP.y - NOSE_BRIDGE.y) / (CHIN.y - NOSE_BRIDGE.y + 1e-6)) * (CHIN.x - NOSE_BRIDGE.x)
   const projection = Math.abs(NOSE_TIP.x - chordX) / (faceWidth + 1e-6)
   const zPush = Math.abs((NOSE_TIP.z ?? 0) - (NOSE_BRIDGE.z ?? 0))
-  const noseRaw = clamp(projection * 3.6 + zPush * 1.6, 0.1, 1)
+  const noseRaw = clamp(projection * 4.0 + zPush * 1.8, 0.05, 1)
 
   const jawWidth = dist(L_JAW, R_JAW)
   const jawRatio = jawWidth / (faceHeight + 1e-6)
   const chinDrop = (CHIN.y - NOSE_BASE.y) / (faceHeight + 1e-6)
-  const jawShape = 1 - clamp(Math.abs(jawRatio - 0.52) / 0.3, 0, 1)
-  const chinShape = 1 - clamp(Math.abs(chinDrop - 0.27) / 0.18, 0, 1)
+  const jawShape = 1 - clamp(Math.abs(jawRatio - 0.5) / 0.24, 0, 1)
+  const chinShape = 1 - clamp(Math.abs(chinDrop - 0.26) / 0.14, 0, 1)
   const cheekEdge =
     Math.max(Math.abs(L_CHEEK.x - NOSE_TIP.x), Math.abs(R_CHEEK.x - NOSE_TIP.x)) /
     (faceWidth + 1e-6)
-  const edgeClarity = clamp(cheekEdge / 0.58, 0.15, 1)
-  const jawline = grade(jawShape * 0.4 + chinShape * 0.35 + edgeClarity * 0.25)
+  const edgeClarity = clamp(cheekEdge / 0.62, 0.1, 1)
+  const gonialProxy = clamp((chinDrop - 0.18) / 0.16, 0, 1)
+  const jawline = grade(
+    jawShape * 0.3 + chinShape * 0.3 + edgeClarity * 0.2 + gonialProxy * 0.2,
+  )
 
   const silhouette =
-    1 - clamp(Math.abs(FOREHEAD.x - CHIN.x) / (faceWidth * 0.5 + 1e-6), 0, 1)
-  const profileHarmony = grade(noseRaw * 0.35 + angleRaw * 0.35 + silhouette * 0.3)
+    1 - clamp(Math.abs(FOREHEAD.x - CHIN.x) / (faceWidth * 0.45 + 1e-6), 0, 1)
+  const foreheadSlope = clamp(1 - Math.abs(FOREHEAD.x - NOSE_BRIDGE.x) / (faceWidth * 0.35), 0, 1)
+  const profileHarmony = grade(
+    noseRaw * 0.3 + angleRaw * 0.25 + silhouette * 0.25 + foreheadSlope * 0.2,
+  )
 
   return sideFactorRows(profileHarmony, jawline, profilePresence, absYaw, eyeCollapse)
 }
@@ -492,20 +518,26 @@ function combineScores(
     weightSum += adj
   }
 
-  // Strict PSL: ~1–2 lower than a soft curve; a true 10 is reserved for near-perfect.
+  // Very strict PSL stack — elite faces only clear 8+, 10 is almost unreachable.
   const raw = weighted / weightSum
-  const overall = round1(clamp(raw - 0.55, 1, 9.6))
-  const weakest = [...factors].sort((a, b) => a.score - b.score)[0]
+  const overall = round1(clamp(raw * 0.92 - 1.15, 1, 9.2))
+  const harshFactors = factors.map((f) => ({
+    ...f,
+    score: round1(clamp(f.score - 0.85, 1, 9.0)),
+  }))
+  const weakest = [...harshFactors].sort((a, b) => a.score - b.score)[0]
   const tip =
-    overall >= 8
-      ? 'Stærkt scan — men 10 kræver næsten perfekt lys, vinkel og knoglelæsning.'
-      : weakest.source === 'side'
-        ? 'Tag sidebilledet lige fra siden med blødt lys foran ansigtet.'
-        : weakest.key === 'symmetry'
-          ? 'Tag frontbilledet lige forfra med samme lys på begge kinder.'
-          : 'Front lige ind i kameraet, side ca. 90° — begge skarpe og godt belyste.'
+    overall >= 7.5
+      ? 'Højt PSL-bånd — næste løft kommer fra det svageste træk, ikke fra “næsten perfekt”.'
+      : weakest.key === 'jawline' || weakest.key === 'profile'
+        ? 'Løft kæbe/hage først: lavere ansigtsfedt, nakke, eventuelt mewing-konsistens.'
+        : weakest.key === 'eyeBalance'
+          ? 'Øjne trækker dig ned — søvn, brynform og evt. soft fixes før hårdere valg.'
+          : weakest.key === 'symmetry'
+            ? 'Asymmetri trækker PSL — holdning, tyggemønster og jævn muskelbrug hjælper lidt.'
+            : 'Start med fedtprocent, frisure der passer til knoglerne, og det røde område i din scan.'
 
-  return { overall, factors, tip, front, side }
+  return { overall, factors: harshFactors, tip, front, side }
 }
 
 async function detectAngle(
