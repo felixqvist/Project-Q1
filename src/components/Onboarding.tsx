@@ -464,11 +464,12 @@ function ScreenshotSlide({
       <div className="shot-frame">
         <img src={src} alt={alt} draggable={false} />
         <div className="shot-back-block" aria-hidden="true" />
-        <button type="button" className="shot-next-hit" onClick={onNext} aria-label="Next" />
+        <div className="shot-next-bar">
+          <button type="button" className="btn-next-white" onClick={onNext}>
+            Next
+          </button>
+        </div>
       </div>
-      <button type="button" className="btn-next-white shot-next-fallback" onClick={onNext}>
-        Next
-      </button>
     </section>
   )
 }

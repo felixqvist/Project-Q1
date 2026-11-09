@@ -150,39 +150,20 @@
   pointer-events: auto;
 }
 
-.shot-next-hit {
+.shot-next-bar {
   position: absolute;
-  left: 7%;
-  right: 7%;
-  bottom: 2.5%;
-  height: 11%;
-  z-index: 2;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.shot-next-fallback {
-  position: absolute;
-  left: 50%;
-  bottom: 1.1rem;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 3;
-  width: min(360px, calc(100% - 2rem));
-  opacity: 0;
+  padding: 0.85rem 1rem calc(0.95rem + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.72) 42%, #000 100%);
   pointer-events: none;
 }
 
-@media (min-width: 900px) {
-  .shot-next-fallback {
-    opacity: 1;
-    pointer-events: auto;
-    position: static;
-    transform: none;
-    margin-top: 0.85rem;
-    width: min(430px, 100%);
-  }
+.shot-next-bar .btn-next-white {
+  pointer-events: auto;
+  width: 100%;
 }
 
 .form-slide {
