@@ -324,7 +324,7 @@ export default function App() {
       {showChrome ? (
         <header className="nav">
           <button type="button" className="brand" onClick={() => void resetScan()}>
-            SPE<span>JL</span>
+            AI PSL <span>Scan</span>
           </button>
           <nav className={`nav-links${menuOpen ? ' open' : ''}`}>
             <button
@@ -536,7 +536,7 @@ export default function App() {
                   </div>
                   <div>
                     <strong>{profile?.name || answers.name}</strong>
-                    <span>{profile?.email || answers.looksmaxPlan || 'SPEJL user'}</span>
+                    <span>{profile?.email || answers.looksmaxPlan || 'AI PSL Scan user'}</span>
                   </div>
                 </div>
                 <button type="button" className="btn-blue wide" onClick={() => void startCameraFor('front')}>

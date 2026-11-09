@@ -164,12 +164,12 @@ export default function Onboarding({ ready, onComplete }: Props) {
           </div>
           <div className="landing-frame">
             <p className="landing-kicker">
-              <span>PSL</span>
-              <i />
               <span>FACE ARCHITECTURE</span>
+              <i />
+              <span>ON-DEVICE</span>
             </p>
-            <h1 className="landing-brand">
-              SPE<span>JL</span>
+            <h1 className="landing-brand landing-brand-long">
+              AI PSL <span>Scan</span>
             </h1>
             <p className="landing-line">become the best looking version of yourself</p>
             <button type="button" className="btn-get-started" onClick={goNext} disabled={!ready}>
