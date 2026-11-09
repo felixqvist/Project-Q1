@@ -750,8 +750,8 @@
   object-fit: cover;
   object-position: center top;
   display: block;
-  transform: scale(1.04);
-  animation: landingDrift 18s ease-in-out infinite alternate;
+  transform: none;
+  animation: none;
   filter: saturate(1.05) contrast(1.08);
 }
 
@@ -767,11 +767,12 @@
 .landing-grain {
   position: absolute;
   inset: 0;
-  opacity: 0.14;
+  opacity: 0.08;
   mix-blend-mode: soft-light;
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  animation: grainShift 1.2s steps(2) infinite;
+  animation: none;
+  transform: none;
 }
 
 .landing-glow {
