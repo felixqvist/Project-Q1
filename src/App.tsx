@@ -324,7 +324,7 @@ export default function App() {
       {showChrome ? (
         <header className="nav">
           <button type="button" className="brand" onClick={() => void resetScan()}>
-            AI PSL <span>Scan</span>
+            AI PSL <span className="brand-scan">Scan</span>
           </button>
           <nav className={`nav-links${menuOpen ? ' open' : ''}`}>
             <button

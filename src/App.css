@@ -524,14 +524,33 @@
 }
 
 .landing-brand-long {
-  font-size: clamp(2.6rem, 11vw, 3.8rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  font-size: clamp(2.35rem, 10vw, 3.35rem);
   letter-spacing: -0.04em;
-  line-height: 1.02;
-  max-width: 11ch;
+  line-height: 0.95;
+  max-width: none;
 }
 
-.landing-brand span {
+.landing-brand-top {
+  color: #fff;
+  font-weight: 800;
+}
+
+.landing-brand-scan {
+  display: inline-block;
   color: #67e8f9;
+  font-size: 1.28em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 24px rgba(103, 232, 249, 0.45),
+    0 8px 28px rgba(0, 0, 0, 0.45);
+  border-bottom: 3px solid rgba(103, 232, 249, 0.85);
+  padding-bottom: 0.08em;
 }
 
 .landing-line {
@@ -1173,11 +1192,14 @@
   letter-spacing: 0.01em;
 }
 
-.brand span {
+.brand span,
+.brand-scan {
   background: linear-gradient(120deg, var(--blue-bright), var(--cyan));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .nav-links {

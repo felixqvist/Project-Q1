@@ -169,7 +169,8 @@ export default function Onboarding({ ready, onComplete }: Props) {
               <span>ON-DEVICE</span>
             </p>
             <h1 className="landing-brand landing-brand-long">
-              AI PSL <span>Scan</span>
+              <span className="landing-brand-top">AI PSL</span>
+              <span className="landing-brand-scan">Scan</span>
             </h1>
             <p className="landing-line">become the best looking version of yourself</p>
             <button type="button" className="btn-get-started" onClick={goNext} disabled={!ready}>
