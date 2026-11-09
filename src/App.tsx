@@ -9,6 +9,7 @@ import {
 } from './lib/faceAnalysis'
 import { LOOKSMAX_STATS, PSL_TIERS } from './data/stats'
 import Onboarding from './components/Onboarding'
+import PoseGuide from './components/PoseGuide'
 import {
   EMPTY_ANSWERS,
   IDOLS,
@@ -17,7 +18,10 @@ import {
 import './App.css'
 
 type Page = 'scan' | 'stats' | 'account' | 'profile' | 'faq' | 'about'
-type ScanStep = 'onboarding' | 'front' | 'side' | 'result' | 'flaws'
+type ScanStep = 'onboarding' | 'front' | 'side' | 'analyzing' | 'result' | 'flaws'
+
+const ANALYZE_QUOTE =
+  "You didn't choose your genetics, but you chose to be here — which means you're already ahead of 97% of people."
 
 type Profile = { name: string; email: string }
 
@@ -124,6 +128,7 @@ export default function App() {
   const [cameraOn, setCameraOn] = useState(false)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
   const [answers, setAnswers] = useState<OnboardingAnswers>(EMPTY_ANSWERS)
+  const [analyzeProgress, setAnalyzeProgress] = useState(0)
   const [profile, setProfile] = useState<Profile | null>(() => {
     try {
       const raw = localStorage.getItem(PROFILE_KEY)
@@ -321,6 +326,20 @@ export default function App() {
     await startCameraFor(angle, next)
   }
 
+  function tweenProgress(from: number, to: number, ms: number) {
+    return new Promise<void>((resolve) => {
+      const start = performance.now()
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / ms)
+        const eased = 1 - (1 - t) ** 3
+        setAnalyzeProgress(Math.round(from + (to - from) * eased))
+        if (t < 1) requestAnimationFrame(tick)
+        else resolve()
+      }
+      requestAnimationFrame(tick)
+    })
+  }
+
   async function runCombined(frontSrc: string, sideSrc: string) {
     if (!ready) {
       setError('Model is not ready yet.')
@@ -329,10 +348,20 @@ export default function App() {
     setBusy(true)
     setError(null)
     setHint(null)
-    setStatus('Scanning front + side…')
-    try {
+    setAnalyzeProgress(0)
+    setStep('analyzing')
+    setStatus('Scanning…')
+
+    const analysis = (async () => {
       const [frontImg, sideImg] = await Promise.all([loadImage(frontSrc), loadImage(sideSrc)])
-      const scored = await analyzeFrontAndSide(frontImg, sideImg)
+      return analyzeFrontAndSide(frontImg, sideImg)
+    })()
+
+    try {
+      const minSpin = tweenProgress(0, 88, 4200)
+      const scored = await analysis
+      await minSpin
+      await tweenProgress(88, 100, 700)
       setResult(scored)
       setStep('result')
       setStatus('Scan complete')
@@ -343,6 +372,7 @@ export default function App() {
       setHint([frontHint, sideHint, idolHint].filter(Boolean).join(' ') || null)
     } catch (err) {
       setResult(null)
+      setAnalyzeProgress(0)
       if (err instanceof Error && err.message === 'NO_FACE_FRONT') {
         setError('No face in front photo.')
         setStep('front')
@@ -351,6 +381,7 @@ export default function App() {
         setStep('side')
       } else {
         setError('Analysis failed. Try again.')
+        setStep('side')
       }
       setStatus('')
     } finally {
@@ -394,10 +425,15 @@ export default function App() {
   const overall100 = result ? scoreTo100(result.overall) : 0
   const ringColor =
     overall100 >= 75 ? 'var(--blue)' : overall100 >= 60 ? 'var(--orange)' : 'var(--red)'
-  const showChrome = !(page === 'scan' && step === 'onboarding')
+  const hideChrome = page === 'scan' && (step === 'onboarding' || step === 'analyzing')
+  const showChrome = !hideChrome
 
   return (
-    <div className={`app${page === 'scan' && step === 'onboarding' ? ' landing-mode' : ''}`}>
+    <div
+      className={`app${page === 'scan' && step === 'onboarding' ? ' landing-mode' : ''}${
+        page === 'scan' && step === 'analyzing' ? ' analyze-mode' : ''
+      }`}
+    >
       {showChrome ? (
         <header className="nav">
           <button type="button" className="brand" onClick={() => void resetScan()}>
@@ -473,11 +509,18 @@ export default function App() {
               ) : (
                 <div className="view-empty" />
               )}
+              <div className="pose-layer" aria-hidden="true">
+                <PoseGuide angle={activeAngle} />
+              </div>
               <div className="guide" aria-hidden="true">
                 {activeAngle === 'front' ? <div className="oval" /> : <div className="profile-guide" />}
               </div>
               <div className="corners" aria-hidden="true" />
-              <div className="align-pill">Align your face inside the outline</div>
+              <div className="align-pill">
+                {activeAngle === 'front'
+                  ? 'Match the AI guide — face the camera'
+                  : 'Match the AI guide — turn to the side'}
+              </div>
             </div>
             <div className="hint-row">
               <span>Good light</span>
@@ -503,6 +546,21 @@ export default function App() {
               </button>
             </div>
             <p className={`status${error ? ' error' : ''}`}>{error ?? status}</p>
+          </section>
+        ) : null}
+
+        {page === 'scan' && step === 'analyzing' ? (
+          <section className="analyze-screen" aria-live="polite">
+            <p className="analyze-name">{answers.name.trim() || 'You'}</p>
+            <p className="analyze-quote">{ANALYZE_QUOTE}</p>
+            <div className="analyze-meter" aria-label={`Analyzing ${analyzeProgress} percent`}>
+              <strong>{analyzeProgress}</strong>
+              <span>/ 100</span>
+            </div>
+            <div className="analyze-bar">
+              <i style={{ width: `${analyzeProgress}%` }} />
+            </div>
+            <p className="analyze-caption">Reading front + side structure…</p>
           </section>
         ) : null}
 
