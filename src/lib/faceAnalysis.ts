@@ -111,10 +111,10 @@ function round1(n: number): number {
  * Map a 0–1 quality signal to a PSL-style grade.
  * Sub-3 is reserved for clearly weak structure; 10 stays rare.
  */
-function grade(quality: number, floor = 3.2, ceil = 9.3): number {
+function grade(quality: number, floor = 3.8, ceil = 9.5): number {
   const q = clamp(quality, 0, 1)
-  // Mild concave curve — average faces sit mid; elite still uncommon
-  const curved = Math.pow(q, 1.35)
+  // Softer curve — under 3 stays rare; strong faces can clear high 7–8s
+  const curved = Math.pow(q, 1.22)
   return round1(floor + curved * (ceil - floor))
 }
 
@@ -518,9 +518,9 @@ function combineScores(
     weightSum += adj
   }
 
-  // Balanced-strict PSL: soft faces stay mid; under ~3 only if quality is truly weak.
+  // Soft-strict PSL: typical faces mid/high; under ~3 only if structure is clearly weak.
   const raw = weighted / weightSum
-  const overall = round1(clamp(raw - 0.35, 2.8, 9.5))
+  const overall = round1(clamp(raw - 0.1, 3.0, 9.6))
   const weakest = [...factors].sort((a, b) => a.score - b.score)[0]
   const tip =
     overall >= 7.5

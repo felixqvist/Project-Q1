@@ -51,7 +51,49 @@ function factor(result: AnalysisResult, key: ScoreFactor['key'], source?: ScoreF
 }
 
 function offset(base: number, delta: number) {
-  return round1(clamp(base + delta, 2.8, 9.4))
+  return round1(clamp(base + delta, 3.0, 9.5))
+}
+
+export type FeatureGauge = {
+  id: string
+  label: string
+  score: number
+}
+
+/** 3×3 feature gauges under the photo (Overall slide). */
+export function buildFeatureGrid(
+  result: AnalysisResult,
+  answers: OnboardingAnswers,
+): FeatureGauge[] {
+  const cats = buildCategoryRatings(result, answers)
+  const find = (catId: CategoryId, subId: string) =>
+    cats.find((c) => c.id === catId)?.subs.find((s) => s.id === subId)?.score
+  const symmetry = factor(result, 'symmetry')?.score ?? result.overall
+  const eyes = factor(result, 'eyeBalance')?.score ?? result.overall
+  const jaw = factor(result, 'jawline')?.score ?? result.overall
+  const presence =
+    factor(result, 'presence', 'front')?.score ??
+    factor(result, 'presence')?.score ??
+    result.overall
+
+  return [
+    { id: 'symmetry', label: 'Symmetry', score: round1(symmetry) },
+    { id: 'skin', label: 'Skin', score: offset(presence, -0.15) },
+    { id: 'jawline', label: 'Jawline', score: round1(jaw) },
+    { id: 'eyes', label: 'Eye Area', score: round1(eyes) },
+    { id: 'cheeks', label: 'Cheekbones', score: find('midface', 'cheekbones') ?? offset(result.overall, 0.1) },
+    { id: 'nose', label: 'Nose', score: find('midface', 'nose') ?? offset(result.overall, -0.2) },
+    { id: 'lips', label: 'Lips', score: find('lower', 'lips') ?? offset(presence, -0.3) },
+    {
+      id: 'hair',
+      label: 'Hair/Brows',
+      score: round1(
+        ((find('upper', 'hairline') ?? result.overall) + (find('upper', 'brow') ?? result.overall)) /
+          2,
+      ),
+    },
+    { id: 'harmony', label: 'Harmony', score: find('psl', 'harmony') ?? round1(result.overall) },
+  ]
 }
 
 function pick(score: number, weak: string, ok: string, strong: string) {
@@ -78,11 +120,11 @@ export function buildCategoryRatings(
   let potBoost = 0.05
   if (answers.looksmaxPlan === 'softmaxing' || answers.looksmaxPlan === 'natural') potBoost += 0.08
   if (answers.looksmaxPlan === 'hardmaxing') potBoost += 0.2
-  const potential = round1(clamp((result.overall + best) / 2 + potBoost - 0.25, 3.0, 9.3))
+  const potential = round1(clamp((result.overall + best) / 2 + potBoost - 0.05, 3.2, 9.5))
 
-  const midface = round1(clamp(proportions * 0.55 + symmetry * 0.45 - 0.25, 2.8, 9.3))
-  const lower = round1(clamp(jaw * 0.65 + profile * 0.35 - 0.2, 2.8, 9.3))
-  const upper = round1(clamp(presence * 0.5 + proportions * 0.3 + eyes * 0.2 - 0.25, 2.8, 9.3))
+  const midface = round1(clamp(proportions * 0.55 + symmetry * 0.45 - 0.05, 3.0, 9.5))
+  const lower = round1(clamp(jaw * 0.65 + profile * 0.35, 3.0, 9.5))
+  const upper = round1(clamp(presence * 0.5 + proportions * 0.3 + eyes * 0.2 - 0.05, 3.0, 9.5))
   const psl = round1(result.overall)
 
   const mk = (
@@ -286,8 +328,8 @@ export function buildCategoryRatings(
     {
       id: 'eyes',
       label: 'EYES',
-      score: round1(clamp(eyes - 0.15, 2.8, 9.3)),
-      score100: to100(clamp(eyes - 0.15, 2.8, 9.3)),
+      score: round1(clamp(eyes, 3.0, 9.5)),
+      score100: to100(clamp(eyes, 3.0, 9.5)),
       photo: 'front',
       blurb: 'Øjne er top-3 for PSL. Svage øjne = lavere tier.',
       subs: [
