@@ -51,12 +51,12 @@ function factor(result: AnalysisResult, key: ScoreFactor['key'], source?: ScoreF
 }
 
 function offset(base: number, delta: number) {
-  return round1(clamp(base + delta, 1.4, 8.8))
+  return round1(clamp(base + delta, 2.8, 9.4))
 }
 
 function pick(score: number, weak: string, ok: string, strong: string) {
-  if (score < 5.0) return weak
-  if (score < 6.8) return ok
+  if (score < 5.2) return weak
+  if (score < 7.0) return ok
   return strong
 }
 
@@ -78,11 +78,11 @@ export function buildCategoryRatings(
   let potBoost = 0.05
   if (answers.looksmaxPlan === 'softmaxing' || answers.looksmaxPlan === 'natural') potBoost += 0.08
   if (answers.looksmaxPlan === 'hardmaxing') potBoost += 0.2
-  const potential = round1(clamp((result.overall + best) / 2 + potBoost - 0.7, 2.0, 8.7))
+  const potential = round1(clamp((result.overall + best) / 2 + potBoost - 0.25, 3.0, 9.3))
 
-  const midface = round1(clamp(proportions * 0.55 + symmetry * 0.45 - 0.7, 1.4, 8.8))
-  const lower = round1(clamp(jaw * 0.65 + profile * 0.35 - 0.65, 1.4, 8.8))
-  const upper = round1(clamp(presence * 0.5 + proportions * 0.3 + eyes * 0.2 - 0.7, 1.4, 8.8))
+  const midface = round1(clamp(proportions * 0.55 + symmetry * 0.45 - 0.25, 2.8, 9.3))
+  const lower = round1(clamp(jaw * 0.65 + profile * 0.35 - 0.2, 2.8, 9.3))
+  const upper = round1(clamp(presence * 0.5 + proportions * 0.3 + eyes * 0.2 - 0.25, 2.8, 9.3))
   const psl = round1(result.overall)
 
   const mk = (
@@ -286,8 +286,8 @@ export function buildCategoryRatings(
     {
       id: 'eyes',
       label: 'EYES',
-      score: round1(clamp(eyes - 0.45, 1.4, 8.8)),
-      score100: to100(clamp(eyes - 0.45, 1.4, 8.8)),
+      score: round1(clamp(eyes - 0.15, 2.8, 9.3)),
+      score100: to100(clamp(eyes - 0.15, 2.8, 9.3)),
       photo: 'front',
       blurb: 'Øjne er top-3 for PSL. Svage øjne = lavere tier.',
       subs: [
@@ -653,7 +653,7 @@ export function marksForCategory(
 }
 
 export function scoreTone(score: number): 'bad' | 'mid' | 'good' {
-  if (score < 5.0) return 'bad'
-  if (score < 6.8) return 'mid'
+  if (score < 5.2) return 'bad'
+  if (score < 7.0) return 'mid'
   return 'good'
 }

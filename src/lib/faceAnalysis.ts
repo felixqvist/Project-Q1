@@ -108,13 +108,13 @@ function round1(n: number): number {
 }
 
 /**
- * Map a 0–1 quality signal to a harsh PSL-style grade.
- * A true 10 is reserved for near-perfect bone + harmony reads.
+ * Map a 0–1 quality signal to a PSL-style grade.
+ * Sub-3 is reserved for clearly weak structure; 10 stays rare.
  */
-function grade(quality: number, floor = 1.6, ceil = 8.9): number {
+function grade(quality: number, floor = 3.2, ceil = 9.3): number {
   const q = clamp(quality, 0, 1)
-  // Steeper concave curve — average faces land mid/low; elite is rare
-  const curved = Math.pow(q, 1.75)
+  // Mild concave curve — average faces sit mid; elite still uncommon
+  const curved = Math.pow(q, 1.35)
   return round1(floor + curved * (ceil - floor))
 }
 
@@ -518,14 +518,10 @@ function combineScores(
     weightSum += adj
   }
 
-  // Very strict PSL stack — elite faces only clear 8+, 10 is almost unreachable.
+  // Balanced-strict PSL: soft faces stay mid; under ~3 only if quality is truly weak.
   const raw = weighted / weightSum
-  const overall = round1(clamp(raw * 0.92 - 1.15, 1, 9.2))
-  const harshFactors = factors.map((f) => ({
-    ...f,
-    score: round1(clamp(f.score - 0.85, 1, 9.0)),
-  }))
-  const weakest = [...harshFactors].sort((a, b) => a.score - b.score)[0]
+  const overall = round1(clamp(raw - 0.35, 2.8, 9.5))
+  const weakest = [...factors].sort((a, b) => a.score - b.score)[0]
   const tip =
     overall >= 7.5
       ? 'Højt PSL-bånd — næste løft kommer fra det svageste træk, ikke fra “næsten perfekt”.'
@@ -537,7 +533,7 @@ function combineScores(
             ? 'Asymmetri trækker PSL — holdning, tyggemønster og jævn muskelbrug hjælper lidt.'
             : 'Start med fedtprocent, frisure der passer til knoglerne, og det røde område i din scan.'
 
-  return { overall, factors: harshFactors, tip, front, side }
+  return { overall, factors, tip, front, side }
 }
 
 async function detectAngle(
