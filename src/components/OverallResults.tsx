@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   buildCategoryRatings,
-  buildFeatureGrid,
   marksForCategory,
   scoreTone,
-  type FeatureGauge,
-  type SubRating,
+  type CategoryRating,
 } from '../data/ratings'
 import type { AnalysisResult } from '../lib/faceAnalysis'
 import type { OnboardingAnswers } from '../data/onboarding'
@@ -21,9 +19,7 @@ type Props = {
 
 export default function OverallResults({ result, answers, frontUrl, sideUrl, onRescan }: Props) {
   const categories = buildCategoryRatings(result, answers)
-  const features = buildFeatureGrid(result, answers)
   const [index, setIndex] = useState(0)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const startX = useRef(0)
   const deltaX = useRef(0)
   const swiping = useRef(false)
@@ -33,10 +29,9 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
   const detailMarks = marks
     .slice()
     .sort((a, b) => a.score - b.score)
-    .slice(0, 6)
+    .slice(0, 4)
 
   function go(next: number) {
-    setSelectedId(null)
     setIndex(Math.max(0, Math.min(categories.length - 1, next)))
   }
 
@@ -79,25 +74,25 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
   const useSide: 'front' | 'side' =
     preferredMarks.length > 0 ? preferred : preferred === 'side' ? 'front' : 'side'
   const useUrl = useSide === 'side' ? sideUrl : frontUrl
-  const useMesh = useSide === 'side' ? result.side : result.front
-
-  const gauges: FeatureGauge[] =
-    current.id === 'overall'
-      ? features
-      : current.subs.slice(0, 9).map((s) => ({ id: s.id, label: s.label, score: s.score }))
-
-  const selectedSub: SubRating | null =
-    current.id === 'overall'
-      ? null
-      : (current.subs.find((s) => s.id === selectedId) ?? current.subs[0] ?? null)
+  const useMarks = detailMarks.filter((m) => m.photo === useSide)
+  const slideSubs = useMarks
+    .map((m) => current.subs.find((s) => s.id === m.id))
+    .filter((s): s is NonNullable<typeof s> => !!s)
+    .slice(0, 4)
 
   return (
-    <section className="results-screen gauge-mode" aria-label="Scan results">
-      <header className="results-top compact">
+    <section className="results-screen simple" aria-label="Scan results">
+      <header className="results-top">
         <p className="results-kicker">
           {index + 1} / {categories.length} · {answers.name.trim() || 'Din'} scan
         </p>
         <h1 className="results-title">{current.label}</h1>
+        <ScoreCircle score={current.score} size="lg" />
+        <p className="results-blurb">
+          {current.id === 'overall'
+            ? 'Din samlede score. Swipe → for at se hvert område på billedet.'
+            : current.blurb}
+        </p>
       </header>
 
       <div
@@ -107,57 +102,70 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <div className="results-slide gauge-slide">
-          <FaceAnnotator
-            src={current.id === 'overall' ? frontUrl : useUrl}
-            alt={`${current.label} photo`}
-            marks={current.id === 'overall' ? [] : detailMarks}
-            side={current.id === 'overall' ? 'front' : useSide}
-            numbered={current.id !== 'overall'}
-            limit={6}
-            mesh={current.id === 'overall' ? result.front : useMesh}
-            compact
-          />
-
-          <div className="gauge-grid" role="list">
-            {gauges.map((g) => (
-              <GaugeRing
-                key={g.id}
-                label={g.label}
-                score={g.score}
-                active={selectedId === g.id}
-                onClick={() => setSelectedId(g.id)}
-              />
-            ))}
-          </div>
-
-          {current.id !== 'overall' && selectedSub ? (
-            <div className={`gauge-tip ${scoreTone(selectedSub.score)}`}>
-              <p>
-                <b>{selectedSub.label}</b> — {selectedSub.why}
-              </p>
-              <p>
-                <b>Sådan hæver du PSL</b> {selectedSub.fix}
-              </p>
+        {current.id === 'overall' ? (
+          <div className="results-slide overview">
+            <div className="results-photos duo clean">
+              <figure>
+                <img src={frontUrl ?? undefined} alt="Front" />
+                <figcaption>Front</figcaption>
+              </figure>
+              <figure>
+                <img src={sideUrl ?? undefined} alt="Side" />
+                <figcaption>Side</figcaption>
+              </figure>
             </div>
-          ) : null}
 
-          {current.id === 'overall' ? (
-            <p className="gauge-tip soft">
-              Swipe › for PSL, øjne, midface m.m. — og konkrete tips til at hæve scoren.
-            </p>
-          ) : null}
-        </div>
-      </div>
+            <div className="results-simple-list">
+              <p className="results-list-title">Områder · tryk eller swipe →</p>
+              {categories
+                .filter((c) => c.id !== 'overall')
+                .map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`results-row ${scoreTone(c.score)}`}
+                    onClick={() => go(i + 1)}
+                  >
+                    <span className="results-row-name">{prettyLabel(c)}</span>
+                    <ScoreCircle score={c.score} size="sm" />
+                    <span className="results-row-go" aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        ) : (
+          <div className="results-slide detail">
+            <FaceAnnotator
+              src={useUrl}
+              alt={`${current.label} photo`}
+              marks={useMarks}
+              side={useSide}
+              numbered
+              limit={4}
+            />
+            <p className="results-map-hint">Tallene på billedet matcher boksene nedenunder</p>
 
-      <div className="overall-dock">
-        <span className="overall-dock-label">
-          <i aria-hidden="true" />
-          Overall
-        </span>
-        <strong className={scoreTone(categories[0]?.score ?? result.overall)}>
-          {(categories[0]?.score ?? result.overall).toFixed(1)}
-        </strong>
+            <div className="results-simple-list">
+              {slideSubs.map((sub, i) => (
+                <article key={sub.id} className={`results-card ${scoreTone(sub.score)}`}>
+                  <div className="results-card-top">
+                    <span className="results-card-num">{i + 1}</span>
+                    <span className="results-card-name">{sub.label}</span>
+                    <ScoreCircle score={sub.score} size="sm" />
+                  </div>
+                  <p>
+                    <b>Hvorfor scoren er her</b> {sub.why}
+                  </p>
+                  <p>
+                    <b>Sådan hæver du PSL</b> {sub.fix}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <nav className="results-nav" aria-label="Result pages">
@@ -177,7 +185,7 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
               type="button"
               className={i === index ? 'on' : ''}
               aria-label={c.label}
-              onClick={() => go(i)}
+              onClick={() => setIndex(i)}
             />
           ))}
         </div>
@@ -200,46 +208,19 @@ export default function OverallResults({ result, answers, frontUrl, sideUrl, onR
   )
 }
 
-function GaugeRing({
-  score,
-  label,
-  active,
-  onClick,
-}: {
-  score: number
-  label: string
-  active?: boolean
-  onClick?: () => void
-}) {
+function ScoreCircle({ score, size }: { score: number; size: 'sm' | 'lg' }) {
   const tone = scoreTone(score)
-  const r = 34
-  const c = 2 * Math.PI * r
-  const pct = Math.max(0.04, Math.min(1, score / 10))
-
   return (
-    <button
-      type="button"
-      className={`gauge-ring ${tone}${active ? ' active' : ''}`}
-      onClick={onClick}
-      role="listitem"
-      aria-label={`${label} ${score.toFixed(1)}`}
-    >
-      <span className="gauge-ring-viz" aria-hidden="true">
-        <svg viewBox="0 0 100 100">
-          <circle className="gauge-track" cx="50" cy="50" r={r} />
-          <circle
-            className="gauge-fill"
-            cx="50"
-            cy="50"
-            r={r}
-            strokeDasharray={`${c * pct} ${c}`}
-            transform="rotate(-90 50 50)"
-          />
-        </svg>
-        <strong>{score.toFixed(1)}</strong>
-      </span>
-      <span className="gauge-label">{label}</span>
-    </button>
+    <div className={`score-circle ${tone} ${size}`} aria-label={`Score ${score.toFixed(1)} of 10`}>
+      <strong>{score.toFixed(1)}</strong>
+    </div>
   )
 }
 
+function prettyLabel(c: CategoryRating) {
+  if (c.id === 'lower') return 'Lower third'
+  if (c.id === 'upper') return 'Upper third'
+  if (c.id === 'psl') return 'PSL'
+  if (c.id === 'potential') return 'Potential'
+  return c.label.charAt(0) + c.label.slice(1).toLowerCase()
+}
